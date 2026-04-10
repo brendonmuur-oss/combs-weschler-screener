@@ -1,0 +1,15 @@
+# Data cache (large, regenerated weekly)
+data/sp500_cache.pkl
+data/analysis_results.pkl
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+nohup.out
+
+# Jupyter runtime
+.jupyter/
