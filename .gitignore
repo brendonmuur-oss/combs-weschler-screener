@@ -13,3 +13,4 @@ nohup.out
 
 # Jupyter runtime
 .jupyter/
+# Notebook contains SMTP credentials - be careful sharing
