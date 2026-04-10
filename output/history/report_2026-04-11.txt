@@ -1,0 +1,73 @@
+COMBS-WESCHLER SCREENER — WEEKLY REPORT
+Date: 2026-04-11
+Stocks analysed: 503
+History: 1 snapshots
+
+══════════════════════════════════════════════════════════════════════
+  CHANGES — TOP 20 ROSTER
+══════════════════════════════════════════════════════════════════════
+
+  ℹ️  First run — no previous data to compare.
+
+══════════════════════════════════════════════════════════════════════
+  HIGHEST CONVICTION — Combs ≥60 AND Weschler ≥60
+  (Both lenses agree: quality business + attractive price)
+══════════════════════════════════════════════════════════════════════
+
+    #  Ticker  Company                         Combs  Wesch   Comb    ROIC   52wDr  FCFYld
+  -------------------------------------------------------------------------------------
+    1. PAYX    Paychex, Inc.                   70.2  69.0  69.6     22%    -44%    5.6%
+    2. ADP     Automatic Data Processing, In   68.7  66.6  67.6     35%    -41%    5.8%
+    3. NTAP    NetApp, Inc.                    64.0  68.2  66.1     68%    -18%    7.0%
+    4. FICO    Fair Isaac Corporation          65.5  65.2  65.4     64%    -50%    3.4%
+    5. MO      Altria Group, Inc.              65.3  62.2  63.8     50%     -1%    8.1%
+    6. GDDY    GoDaddy Inc.                    61.9  64.0  62.9     33%    -56%   14.7%
+    7. ACN     Accenture plc                   60.4  65.3  62.8     30%    -43%    9.8%
+    8. FDS     FactSet Research Systems Inc.   63.7  61.3  62.5     18%    -53%    7.9%
+    9. FFIV    F5, Inc.                        62.5  61.0  61.8     27%    -10%    5.5%
+   10. ALLE    Allegion plc                    60.7  60.9  60.8     20%    -18%    5.5%
+
+══════════════════════════════════════════════════════════════════════
+  WEEKLY SUMMARY
+══════════════════════════════════════════════════════════════════════
+
+  Top Combined:  ADBE (69.6)
+  Top Combs:     MA (83.3)
+  Top Weschler:  SMCI (73.6)
+  Combs flags:   71
+  Weschler flags: 3
+  Conviction stocks (C≥60 & W≥60): 10
+
+  Score Ranges:
+    Combs:    15.2 – 83.3 (mean 50.1)
+    Weschler: 26.5 – 73.6 (mean 49.3)
+    Combined: 23.4 – 69.6 (mean 49.7)
+
+  Top 10 Combs (Best Businesses):
+     1. MA      83.3  Mastercard Incorporated
+     2. V       81.0  Visa Inc.
+     3. ADBE    79.9  Adobe Inc.
+     4. LLY     78.3  Eli Lilly and Company
+     5. KLAC    76.9  KLA Corporation
+     6. ANET    75.9  Arista Networks, Inc.
+     7. MSFT    75.2  Microsoft Corporation
+     8. CDNS    73.1  Cadence Design Systems, Inc.
+     9. META    72.9  Meta Platforms, Inc.
+    10. SPG     72.3  Simon Property Group, Inc.
+
+  Top 10 Weschler (Mispriced/Contrarian):
+     1. SMCI    73.6  Super Micro Computer, Inc.
+     2. HPQ     73.1  HP Inc.
+     3. MKC     71.0  McCormick & Company, Incorpora
+     4. CDW     69.8  CDW Corporation
+     5. PAYX    69.0  Paychex, Inc.
+     6. EPAM    68.6  EPAM Systems, Inc.
+     7. NTAP    68.2  NetApp, Inc.
+     8. GEN     67.7  Gen Digital Inc.
+     9. CPB     67.0  The Campbell's Company
+    10. ADP     66.6  Automatic Data Processing, Inc
+
+══════════════════════════════════════════════════════════════════════
+  Run: deep_dive("TICKER") in notebook for detailed analysis
+  Next auto-run: Saturday 8:00 AM
+══════════════════════════════════════════════════════════════════════
