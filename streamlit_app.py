@@ -280,22 +280,27 @@ with tab3:
     for t, row in plot_df.nlargest(10, 'combined_score').iterrows():
         fig.add_annotation(x=row['combs_score'], y=row['weschler_score'], text=t, showarrow=True, arrowhead=0, ax=15, ay=-15, font=dict(size=10, color="black"))
 
-    # 3) Mobile touch: pinch-to-zoom + drag-to-pan
-    fig.update_layout(
-        height=700,
-        legend=dict(orientation="h", yanchor="bottom", y=-0.2),
-        dragmode='pan',
+    # 3) Render as raw HTML for native mobile touch (pinch-zoom, pan)
+    import plotly.io as pio
+    chart_html = pio.to_html(
+        fig,
+        full_html=False,
+        include_plotlyjs='cdn',
+        config={
+            "scrollZoom": True,
+            "displayModeBar": True,
+            "modeBarButtonsToRemove": ["select2d", "lasso2d"],
+            "displaylogo": False,
+        }
     )
-    fig.update_xaxes(fixedrange=False)
-    fig.update_yaxes(fixedrange=False)
-
-    # Render chart — NO on_select (it blocks pinch-to-zoom on mobile)
-    st.plotly_chart(fig, use_container_width=True, config={
-        "scrollZoom": True,
-        "displayModeBar": True,
-        "modeBarButtonsToRemove": ["select2d", "lasso2d", "zoomIn2d", "zoomOut2d", "autoScale2d"],
-        "displaylogo": False,
-    })
+    # Wrap in responsive container with touch-action CSS
+    full_html = f"""
+    <div style="width:100%; overflow:hidden; touch-action:none;">
+        {chart_html}
+    </div>
+    """
+    import streamlit.components.v1 as components
+    components.html(full_html, height=720, scrolling=False)
 
     # Manual ticker selection for deep dive (works on mobile)
     st.markdown("---")
@@ -385,7 +390,11 @@ with tab5:
         colorscale='RdYlGn', zmin=35, zmax=65,
     ))
     fig_heat.update_layout(height=500, title="Average Scores by Sector", dragmode='pan')
-    st.plotly_chart(fig_heat, use_container_width=True, config={"scrollZoom": True, "displayModeBar": False})
+
+    import plotly.io as pio
+    import streamlit.components.v1 as components
+    heat_html = pio.to_html(fig_heat, full_html=False, include_plotlyjs='cdn', config={"scrollZoom": True, "displayModeBar": False})
+    components.html(f'<div style="touch-action:none;">{heat_html}</div>', height=520, scrolling=False)
 
     sub_cols = ['combs_unit_economics','combs_frictionless','combs_capital_allocation','combs_moat',
                 'weschler_variant','weschler_complexity','weschler_distressed','weschler_quality','weschler_compounding']
@@ -400,7 +409,8 @@ with tab5:
         colorscale='RdYlGn',
     ))
     fig_sub.update_layout(height=500, title="Sub-Score Breakdown by Sector", dragmode='pan')
-    st.plotly_chart(fig_sub, use_container_width=True, config={"scrollZoom": True, "displayModeBar": False})
+    sub_html = pio.to_html(fig_sub, full_html=False, include_plotlyjs='cdn', config={"scrollZoom": True, "displayModeBar": False})
+    components.html(f'<div style="touch-action:none;">{sub_html}</div>', height=520, scrolling=False)
 
     # 4) Sector macro analysis
     st.markdown("---")
