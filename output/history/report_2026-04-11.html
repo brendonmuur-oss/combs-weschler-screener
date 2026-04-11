@@ -1,0 +1,170 @@
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background: white; }
+        .header { background: linear-gradient(135deg, #1a237e, #0d47a1); color: white; padding: 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 20px; }
+        .header p { margin: 5px 0 0; opacity: 0.8; font-size: 13px; }
+        .section { padding: 16px; border-bottom: 1px solid #e0e0e0; }
+        .section-title { font-size: 16px; font-weight: 700; color: #1a237e; margin: 0 0 12px; }
+        .metric-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
+        .metric-label { color: #666; font-size: 13px; }
+        .metric-value { font-weight: 700; font-size: 14px; }
+        .stock-card { background: #fafafa; border-radius: 8px; padding: 12px; margin: 8px 0; border-left: 4px solid #1a237e; }
+        .stock-name { font-weight: 700; font-size: 15px; color: #1a237e; }
+        .stock-company { font-size: 12px; color: #666; margin-bottom: 6px; }
+        .score-pills { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+        .pill { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+        .change-row { padding: 6px 0; border-bottom: 1px solid #f0f0f0; font-size: 14px; }
+        .badge-in { background: #e8f5e9; color: #2e7d32; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+        .badge-out { background: #ffebee; color: #c62828; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+        .btn { display: inline-block; background: #1a237e; color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f5f5f5; padding: 8px 6px; text-align: left; font-size: 12px; color: #666; }
+        td { padding: 8px 6px; border-bottom: 1px solid #f0f0f0; }
+        .footer { background: #f5f5f5; padding: 16px; text-align: center; font-size: 12px; color: #999; }
+    </style>
+    </head><body>
+    <div class="container">
+
+    <div class="header">
+        <h1>📊 Combs-Weschler Weekly Report</h1>
+        <p>2026-04-11 · 503 stocks analysed</p>
+    </div>
+
+    <!-- Dashboard Link -->
+    <div class="section" style="text-align:center; padding:12px;">
+        <a href="https://combs-weschler-screener-mhmd9c2vs8k9mfzngbqrqp.streamlit.app/" class="btn">📱 Open Interactive Dashboard</a>
+    </div>
+    <div class="section"><div class="section-title">🔄 Top 20 Roster Changes</div><p style="color:#999;">First run — no previous data to compare.</p></div><div class="section"><div class="section-title">🔥 Highest Conviction (Combs ≥60 AND Weschler ≥60)</div><p style="font-size:13px; color:#666;">10 stocks where both lenses agree</p><div class="stock-card" style="border-left-color:#2e7d32;">
+                <div class="stock-name">#1 PAYX</div>
+                <div class="stock-company">Paychex, Inc. · Industrials</div>
+                <div class="score-pills">
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">C: 70</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">W: 69</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32; font-weight:800;">Comb: 69.6</span>
+                </div>
+                <div style="font-size:12px; color:#666;">ROIC: 22.4% · FCF Yield: 5.6% · 52w Draw: -43.9%</div>
+            </div><div class="stock-card" style="border-left-color:#2e7d32;">
+                <div class="stock-name">#2 ADP</div>
+                <div class="stock-company">Automatic Data Processing, Inc. · Industrials</div>
+                <div class="score-pills">
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">C: 69</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">W: 67</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32; font-weight:800;">Comb: 67.6</span>
+                </div>
+                <div style="font-size:12px; color:#666;">ROIC: 34.9% · FCF Yield: 5.8% · 52w Draw: -40.5%</div>
+            </div><div class="stock-card" style="border-left-color:#f57f17;">
+                <div class="stock-name">#3 NTAP</div>
+                <div class="stock-company">NetApp, Inc. · Information Technology</div>
+                <div class="score-pills">
+                    <span class="pill" style="background:#fff8e1; color:#f57f17;">C: 64</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">W: 68</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32; font-weight:800;">Comb: 66.1</span>
+                </div>
+                <div style="font-size:12px; color:#666;">ROIC: 68.3% · FCF Yield: 7.0% · 52w Draw: -17.9%</div>
+            </div><div class="stock-card" style="border-left-color:#2e7d32;">
+                <div class="stock-name">#4 FICO</div>
+                <div class="stock-company">Fair Isaac Corporation · Information Technology</div>
+                <div class="score-pills">
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">C: 65</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">W: 65</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32; font-weight:800;">Comb: 65.4</span>
+                </div>
+                <div style="font-size:12px; color:#666;">ROIC: 63.6% · FCF Yield: 3.4% · 52w Draw: -49.5%</div>
+            </div><div class="stock-card" style="border-left-color:#2e7d32;">
+                <div class="stock-name">#5 MO</div>
+                <div class="stock-company">Altria Group, Inc. · Consumer Staples</div>
+                <div class="score-pills">
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">C: 65</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">W: 62</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32; font-weight:800;">Comb: 63.8</span>
+                </div>
+                <div style="font-size:12px; color:#666;">ROIC: 50.2% · FCF Yield: 8.1% · 52w Draw: -0.8%</div>
+            </div><div class="stock-card" style="border-left-color:#f57f17;">
+                <div class="stock-name">#6 GDDY</div>
+                <div class="stock-company">GoDaddy Inc. · Information Technology</div>
+                <div class="score-pills">
+                    <span class="pill" style="background:#fff8e1; color:#f57f17;">C: 62</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">W: 64</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32; font-weight:800;">Comb: 62.9</span>
+                </div>
+                <div style="font-size:12px; color:#666;">ROIC: 32.6% · FCF Yield: 14.7% · 52w Draw: -56.5%</div>
+            </div><div class="stock-card" style="border-left-color:#f57f17;">
+                <div class="stock-name">#7 ACN</div>
+                <div class="stock-company">Accenture plc · Information Technology</div>
+                <div class="score-pills">
+                    <span class="pill" style="background:#fff8e1; color:#f57f17;">C: 60</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">W: 65</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32; font-weight:800;">Comb: 62.8</span>
+                </div>
+                <div style="font-size:12px; color:#666;">ROIC: 29.6% · FCF Yield: 9.8% · 52w Draw: -42.6%</div>
+            </div><div class="stock-card" style="border-left-color:#f57f17;">
+                <div class="stock-name">#8 FDS</div>
+                <div class="stock-company">FactSet Research Systems Inc. · Financials</div>
+                <div class="score-pills">
+                    <span class="pill" style="background:#fff8e1; color:#f57f17;">C: 64</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">W: 61</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32; font-weight:800;">Comb: 62.5</span>
+                </div>
+                <div style="font-size:12px; color:#666;">ROIC: 18.2% · FCF Yield: 7.9% · 52w Draw: -53.2%</div>
+            </div><div class="stock-card" style="border-left-color:#f57f17;">
+                <div class="stock-name">#9 FFIV</div>
+                <div class="stock-company">F5, Inc. · Information Technology</div>
+                <div class="score-pills">
+                    <span class="pill" style="background:#fff8e1; color:#f57f17;">C: 63</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">W: 61</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32; font-weight:800;">Comb: 61.8</span>
+                </div>
+                <div style="font-size:12px; color:#666;">ROIC: 27.0% · FCF Yield: 5.5% · 52w Draw: -10.3%</div>
+            </div><div class="stock-card" style="border-left-color:#f57f17;">
+                <div class="stock-name">#10 ALLE</div>
+                <div class="stock-company">Allegion plc · Industrials</div>
+                <div class="score-pills">
+                    <span class="pill" style="background:#fff8e1; color:#f57f17;">C: 61</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32;">W: 61</span>
+                    <span class="pill" style="background:#e8f5e9; color:#2e7d32; font-weight:800;">Comb: 60.8</span>
+                </div>
+                <div style="font-size:12px; color:#666;">ROIC: 19.5% · FCF Yield: 5.5% · 52w Draw: -18.0%</div>
+            </div></div><div class="section"><div class="section-title">🎯 Top 10 Combs (Best Businesses)</div><table><tr><th>#</th><th>Ticker</th><th>Score</th><th>ROIC</th><th>Op Margin</th></tr><tr style="background:#e8f5e9;"><td>1</td><td><b>MA</b></td><td style="font-weight:700;">83.3</td><td>97.2%</td><td>59.5%</td></tr><tr style="background:#e8f5e9;"><td>2</td><td><b>V</b></td><td style="font-weight:700;">81.0</td><td>47.9%</td><td>66.4%</td></tr><tr style="background:#e8f5e9;"><td>3</td><td><b>ADBE</b></td><td style="font-weight:700;">79.9</td><td>55.4%</td><td>36.6%</td></tr><tr style="background:#e8f5e9;"><td>4</td><td><b>LLY</b></td><td style="font-weight:700;">78.3</td><td>38.6%</td><td>45.6%</td></tr><tr style="background:#e8f5e9;"><td>5</td><td><b>KLAC</b></td><td style="font-weight:700;">76.9</td><td>50.4%</td><td>41.2%</td></tr><tr style="background:#e8f5e9;"><td>6</td><td><b>ANET</b></td><td style="font-weight:700;">75.9</td><td>30.6%</td><td>42.8%</td></tr><tr style="background:#e8f5e9;"><td>7</td><td><b>MSFT</b></td><td style="font-weight:700;">75.2</td><td>28.3%</td><td>45.6%</td></tr><tr style="background:#e8f5e9;"><td>8</td><td><b>CDNS</b></td><td style="font-weight:700;">73.1</td><td>23.6%</td><td>31.1%</td></tr><tr style="background:#e8f5e9;"><td>9</td><td><b>META</b></td><td style="font-weight:700;">72.9</td><td>22.1%</td><td>41.4%</td></tr><tr style="background:#e8f5e9;"><td>10</td><td><b>SPG</b></td><td style="font-weight:700;">72.3</td><td>9.4%</td><td>49.9%</td></tr></table></div><div class="section"><div class="section-title">🔍 Top 10 Weschler (Mispriced/Contrarian)</div><table><tr><th>#</th><th>Ticker</th><th>Score</th><th>52w Draw</th><th>FCF Yld</th></tr><tr style="background:#e8f5e9;"><td>1</td><td><b>SMCI</b></td><td style="font-weight:700;">73.6</td><td>-57.2%</td><td>10.1%</td></tr><tr style="background:#e8f5e9;"><td>2</td><td><b>HPQ</b></td><td style="font-weight:700;">73.1</td><td>-33.5%</td><td>16.7%</td></tr><tr style="background:#e8f5e9;"><td>3</td><td><b>MKC</b></td><td style="font-weight:700;">71.0</td><td>-27.7%</td><td>5.1%</td></tr><tr style="background:#e8f5e9;"><td>4</td><td><b>CDW</b></td><td style="font-weight:700;">69.8</td><td>-29.2%</td><td>6.7%</td></tr><tr style="background:#e8f5e9;"><td>5</td><td><b>PAYX</b></td><td style="font-weight:700;">69.0</td><td>-43.9%</td><td>5.6%</td></tr><tr style="background:#e8f5e9;"><td>6</td><td><b>EPAM</b></td><td style="font-weight:700;">68.6</td><td>-41.3%</td><td>9.2%</td></tr><tr style="background:#e8f5e9;"><td>7</td><td><b>NTAP</b></td><td style="font-weight:700;">68.2</td><td>-17.9%</td><td>7.0%</td></tr><tr style="background:#e8f5e9;"><td>8</td><td><b>GEN</b></td><td style="font-weight:700;">67.7</td><td>-39.9%</td><td>10.9%</td></tr><tr style="background:#e8f5e9;"><td>9</td><td><b>CPB</b></td><td style="font-weight:700;">67.0</td><td>-36.5%</td><td>11.6%</td></tr><tr style="background:#e8f5e9;"><td>10</td><td><b>ADP</b></td><td style="font-weight:700;">66.6</td><td>-40.5%</td><td>5.8%</td></tr></table></div><div class="section"><div class="section-title">📊 Weekly Summary</div>
+    <div class="metric-row"><span class="metric-label">Top Combined Pick</span><span class="metric-value">ADBE (69.6)</span></div>
+    <div class="metric-row"><span class="metric-label">Top Combs</span><span class="metric-value">MA (83.3)</span></div>
+    <div class="metric-row"><span class="metric-label">Top Weschler</span><span class="metric-value">SMCI (73.6)</span></div>
+    <div class="metric-row"><span class="metric-label">Conviction Stocks</span><span class="metric-value">10</span></div>
+    <div class="metric-row"><span class="metric-label">Combs Flags</span><span class="metric-value">71</span></div>
+    <div class="metric-row"><span class="metric-label">Weschler Flags</span><span class="metric-value">3</span></div>
+    <div class="metric-row"><span class="metric-label">Combs Range</span><span class="metric-value">15 – 83</span></div>
+    <div class="metric-row"><span class="metric-label">Weschler Range</span><span class="metric-value">27 – 74</span></div>
+    </div><div class="section"><div class="section-title">📖 Score Cheat Sheet</div>
+    <table>
+    <tr><th>Combs Sub-Score</th><th>Max</th><th>🟢</th><th>🟡</th><th>🔴</th></tr>
+    <tr><td>Unit Economics</td><td>/25</td><td>&gt;18</td><td>12-18</td><td>&lt;12</td></tr>
+    <tr><td>Frictionless Ops</td><td>/25</td><td>&gt;18</td><td>12-18</td><td>&lt;12</td></tr>
+    <tr><td>★ Capital Allocation</td><td>/25</td><td>&gt;18</td><td>12-18</td><td>&lt;12</td></tr>
+    <tr><td>Moat Strength</td><td>/25</td><td>&gt;18</td><td>12-18</td><td>&lt;12</td></tr>
+    <tr style="font-weight:700;"><td>TOTAL</td><td>/100</td><td>&gt;65</td><td>45-65</td><td>&lt;45</td></tr>
+    </table>
+    <br>
+    <table>
+    <tr><th>Weschler Sub-Score</th><th>Max</th><th>🟢</th><th>🟡</th><th>🔴</th></tr>
+    <tr><td>Variant Perception</td><td>/20</td><td>&gt;14</td><td>8-14</td><td>&lt;8</td></tr>
+    <tr><td>Complexity Discount</td><td>/20</td><td>&gt;14</td><td>8-14</td><td>&lt;8</td></tr>
+    <tr><td>★ Distressed Value</td><td>/20</td><td>&gt;14</td><td>8-14</td><td>&lt;8</td></tr>
+    <tr><td>★ Business Quality</td><td>/20</td><td>&gt;14</td><td>8-14</td><td>&lt;8</td></tr>
+    <tr><td>LT Compounding</td><td>/20</td><td>&gt;14</td><td>8-14</td><td>&lt;8</td></tr>
+    <tr style="font-weight:700;"><td>TOTAL</td><td>/100</td><td>&gt;60</td><td>40-60</td><td>&lt;40</td></tr>
+    </table>
+    <br>
+    <table>
+    <tr><th>Verdict</th><th>Criteria</th></tr>
+    <tr><td>✅ HIGH CONVICTION</td><td>Combined &gt;60 + Quality &gt;14</td></tr>
+    <tr><td>⚠️ RESEARCH FURTHER</td><td>Combined &gt;55 or Combs &gt;65</td></tr>
+    <tr><td>🟡 MONITOR</td><td>Combined &gt;50 + Quality &gt;10</td></tr>
+    <tr><td>❌ VALUE TRAP</td><td>Quality &lt;10 + distressed</td></tr>
+    </table>
+    </div><div class="footer">
+        <a href="https://combs-weschler-screener-mhmd9c2vs8k9mfzngbqrqp.streamlit.app/" style="color:#1a237e;">📱 Open Dashboard</a><br>
+        Next auto-run: Saturday 8:00 AM<br>
+        ★ = highest-weighted metric
+    </div>
+    </div></body></html>
