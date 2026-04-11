@@ -389,12 +389,8 @@ with tab5:
         texttemplate="%{text}",
         colorscale='RdYlGn', zmin=35, zmax=65,
     ))
-    fig_heat.update_layout(height=500, title="Average Scores by Sector", dragmode='pan')
-
-    import plotly.io as pio
-    import streamlit.components.v1 as components
-    heat_html = pio.to_html(fig_heat, full_html=False, include_plotlyjs='cdn', config={"scrollZoom": True, "displayModeBar": False})
-    components.html(f'<div style="touch-action:none;">{heat_html}</div>', height=520, scrolling=False)
+    fig_heat.update_layout(height=500, title="Average Scores by Sector")
+    st.plotly_chart(fig_heat, use_container_width=True)
 
     sub_cols = ['combs_unit_economics','combs_frictionless','combs_capital_allocation','combs_moat',
                 'weschler_variant','weschler_complexity','weschler_distressed','weschler_quality','weschler_compounding']
@@ -408,9 +404,8 @@ with tab5:
         texttemplate="%{text}",
         colorscale='RdYlGn',
     ))
-    fig_sub.update_layout(height=500, title="Sub-Score Breakdown by Sector", dragmode='pan')
-    sub_html = pio.to_html(fig_sub, full_html=False, include_plotlyjs='cdn', config={"scrollZoom": True, "displayModeBar": False})
-    components.html(f'<div style="touch-action:none;">{sub_html}</div>', height=520, scrolling=False)
+    fig_sub.update_layout(height=500, title="Sub-Score Breakdown by Sector")
+    st.plotly_chart(fig_sub, use_container_width=True)
 
     # 4) Sector macro analysis
     st.markdown("---")
