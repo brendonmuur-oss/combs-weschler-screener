@@ -465,9 +465,32 @@ with tab5:
 
         import yfinance as yf
 
+        # Keyword-based sentiment classifier (no external API needed)
+        BULLISH_WORDS = {'upgrade','beat','beats','exceeds','raises','surge','surges','soars','rally','rallies',
+                         'bullish','outperform','buy','strong','growth','record','profit','gains','boost',
+                         'positive','optimistic','upside','momentum','breakout','highs','recovery','rebound',
+                         'accelerat','expand','dividend','overweight','top-pick','above','jumps','improved'}
+        BEARISH_WORDS = {'downgrade','miss','misses','cut','cuts','decline','declines','drop','drops','fall',
+                         'falls','bearish','underperform','sell','weak','loss','losses','warning','risk',
+                         'negative','pessimistic','downside','slowdown','crash','lows','recession','layoff',
+                         'underweight','below','slump','plunge','concern','fears','lawsuit','fraud','probe',
+                         'investigation','debt','default','bankruptcy','restructur','tariff','headwind'}
+
+        def classify_sentiment(title, summary=''):
+            """Classify headline sentiment as bullish/bearish/neutral using keywords."""
+            text = (title + ' ' + summary).lower()
+            bull_count = sum(1 for w in BULLISH_WORDS if w in text)
+            bear_count = sum(1 for w in BEARISH_WORDS if w in text)
+            if bull_count > bear_count:
+                return '🟢 Bullish', bull_count - bear_count
+            elif bear_count > bull_count:
+                return '🔴 Bearish', bear_count - bull_count
+            else:
+                return '⚪ Neutral', 0
+
         @st.cache_data(ttl=3600, show_spinner="Fetching news...")
         def fetch_sector_news(tickers, max_per_ticker=3):
-            """Fetch recent news from Yahoo Finance for a list of tickers."""
+            """Fetch recent news from Yahoo Finance with sentiment classification."""
             all_news = []
             for t in tickers:
                 try:
@@ -483,6 +506,7 @@ with tab5:
                         provider = content.get('provider', {}).get('displayName', '')
                         summary = content.get('summary', '')
                         if title:
+                            sentiment, strength = classify_sentiment(title, summary)
                             all_news.append({
                                 'ticker': t,
                                 'title': title,
@@ -490,6 +514,8 @@ with tab5:
                                 'date': pub_date[:10] if pub_date else '',
                                 'source': provider,
                                 'summary': summary[:200] if summary else '',
+                                'sentiment': sentiment,
+                                'strength': strength,
                             })
                 except Exception:
                     pass
@@ -504,9 +530,32 @@ with tab5:
         news_items = fetch_sector_news(news_tickers)
 
         if news_items:
-            for item in news_items[:12]:
-                link_html = f"[Read →]({item['link']})" if item['link'] else ""
-                st.markdown(f"**{item['ticker']}** · {item['date']} · _{item['source']}_")
+            # Sentiment summary
+            bull_count = sum(1 for n in news_items if 'Bullish' in n['sentiment'])
+            bear_count = sum(1 for n in news_items if 'Bearish' in n['sentiment'])
+            neutral_count = sum(1 for n in news_items if 'Neutral' in n['sentiment'])
+
+            sc1, sc2, sc3 = st.columns(3)
+            sc1.metric("🟢 Bullish", bull_count)
+            sc2.metric("🔴 Bearish", bear_count)
+            sc3.metric("⚪ Neutral", neutral_count)
+
+            # Overall sentiment
+            if bull_count > bear_count * 1.5:
+                st.success(f"**Overall sentiment: Bullish** — {bull_count} positive vs {bear_count} negative headlines")
+            elif bear_count > bull_count * 1.5:
+                st.error(f"**Overall sentiment: Bearish** — {bear_count} negative vs {bull_count} positive headlines")
+            else:
+                st.info(f"**Overall sentiment: Mixed** — {bull_count} positive, {bear_count} negative, {neutral_count} neutral")
+
+            # Filter controls
+            sent_filter = st.radio("Filter:", ["All", "🟢 Bullish", "🔴 Bearish", "⚪ Neutral"], horizontal=True, key="news_filter")
+
+            filtered_news = news_items if sent_filter == "All" else [n for n in news_items if sent_filter in n['sentiment']]
+
+            for item in filtered_news[:15]:
+                sent_badge = item['sentiment']
+                st.markdown(f"{sent_badge} **{item['ticker']}** · {item['date']} · _{item['source']}_")
                 st.markdown(f"[{item['title']}]({item['link']})" if item['link'] else item['title'])
                 if item['summary']:
                     st.caption(item['summary'])
