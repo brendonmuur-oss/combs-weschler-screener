@@ -219,6 +219,89 @@ rm ~/Desktop/data/sp500_full_list.csv
 
 ---
 
+## Score Interpretation Guide
+
+### Combs Score (0–100) — "Is this a great business?"
+
+| Sub-Score | Max | 🟢 Strong | 🟡 Average | 🔴 Weak | Key Metrics (★ = highest weight) |
+|-----------|-----|-----------|------------|---------|----------------------------------|
+| Unit Economics | /25 | >18 | 12–18 | <12 | ★ Gross Margin (30%), ★ Op Margin (30%), Net Margin (20%), Margin Stability (20%) |
+| Frictionless Ops | /25 | >18 | 12–18 | <12 | ★ Rev CAGR 3y (40%), Rev Acceleration (30%), Sector Position (30%) |
+| Capital Allocation | /25 | >18 | 12–18 | <12 | ★ ROIC (35%), ROE (25%), FCF Yield (25%), Reinvest Rate (15%) |
+| Moat Strength | /25 | >18 | 12–18 | <12 | ★ Margin Stability (35%), ★ Competitive Position (35%), Margin Trend (30%) |
+| **TOTAL** | **/100** | **>65** | **45–65** | **<45** | |
+
+### Weschler Score (0–100) — "Is this mispriced?"
+
+| Sub-Score | Max | 🟢 Strong | 🟡 Average | 🔴 Weak | Key Metrics (★ = highest weight) |
+|-----------|-----|-----------|------------|---------|----------------------------------|
+| Variant Perception | /20 | >14 | 8–14 | <8 | ★ PE Gap (35%), ★ PE vs Sector (35%), PEG Ratio (30%) |
+| Complexity Discount | /20 | >14 | 8–14 | <8 | ★ Analyst Coverage (30%), P/B Discount (25%), Short Interest (25%), Altman Z (20%) |
+| Distressed Value | /20 | >14 | 8–14 | <8 | ★ 52w Drawdown (30%), vs 200d MA (25%), FCF Yield (25%), P/B (20%) |
+| Business Quality | /20 | >14 | 8–14 | <8 | ★ ROIC (30%), Earn Consistency (25%), Rev Stability (25%), Interest Coverage (20%) |
+| LT Compounding | /20 | >14 | 8–14 | <8 | ★ Earn CAGR 5y (30%), ★ Rev CAGR 5y (30%), Book Val Growth (25%), Div Yield (15%) |
+| **TOTAL** | **/100** | **>60** | **40–60** | **<40** | |
+
+### Combined Score & Verdicts
+
+| Combined Score | Signal | Meaning |
+|---------------|--------|---------|
+| >60 | 🟢 Strong conviction | Quality business + attractive valuation |
+| 50–60 | 🟡 Worth researching | Strong on one lens, decent on the other |
+| <50 | 🔴 Neither favours | Not compelling from either angle |
+
+| Verdict | Criteria |
+|---------|----------|
+| ✅ **HIGH CONVICTION** | Combined >60 AND Business Quality >14/20 |
+| ⚠️ **RESEARCH FURTHER** | Combined >55 OR (Combs >65 AND Quality >12) |
+| 🟡 **MONITOR** | Combined >50 AND Quality >10 |
+| ❌ **VALUE TRAP RISK** | Quality <10 AND Weschler > Combs |
+| ❌ **NOT COMPELLING** | None of the above |
+
+### Quick Rules of Thumb
+- **Combs >70** = Exceptional business (top ~10% of S&P 500)
+- **Weschler >65** = Significant mispricing signal
+- **Business Quality >15/20** = Good business underneath the distress
+- **Quality <10 + big drawdown** = Likely a value trap, not an opportunity
+- **Both Combs ≥60 AND Weschler ≥60** = Highest conviction (typically only 5-15 stocks)
+
+---
+
+## Streamlit Dashboard (Mobile Access)
+
+The screener includes a Streamlit web dashboard for interactive analysis from any device.
+
+### Deploy to Streamlit Community Cloud (free, permanent URL):
+
+1. Push this repo to GitHub:
+   ```bash
+   # Create a GitHub repo at github.com/new, then:
+   git remote add origin https://github.com/YOUR_USERNAME/combs-weschler-screener.git
+   git branch -M main
+   git push -u origin main
+   ```
+
+2. Go to [share.streamlit.io](https://share.streamlit.io)
+3. Click "New app" → select your repo → set main file to `streamlit_app.py`
+4. Deploy — you'll get a URL like `https://cw-screener.streamlit.app`
+
+### Run locally:
+```bash
+pip install streamlit plotly
+cd ~/Desktop
+streamlit run streamlit_app.py
+```
+
+### Dashboard features:
+- **Rankings tab**: Sortable table with colour-coded scores, sector filtering
+- **Deep Dive tab**: Interactive single-stock analysis with all sub-scores and verdicts
+- **Scatter Plot tab**: Interactive Combs vs Weschler quadrant chart (hover for details)
+- **Conviction tab**: All stocks where both Combs ≥60 AND Weschler ≥60
+- **Sector Heatmap tab**: Interactive heatmaps of scores by sector
+- **Cheat Sheet sidebar**: Always-visible score interpretation guide
+
+---
+
 ## Adjusting Weights
 
 All scoring weights are configurable in Cell 1 of the notebook:

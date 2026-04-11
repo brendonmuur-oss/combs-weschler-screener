@@ -9,8 +9,17 @@ __pycache__/
 
 # macOS
 .DS_Store
+.localized
 nohup.out
 
 # Jupyter runtime
 .jupyter/
+
+# Personal files (not part of screener)
+*.png
+!output/*.png
+*.docx
+md_to_docx.py
+oracles_playbook_v2.*
+Screenshot*
 # Notebook contains SMTP credentials - be careful sharing
