@@ -114,20 +114,80 @@ for p in ['data/screener_results.csv', '/Users/brendonmuur/Desktop/data/screener
 st.caption(f"Last updated: {last_modified} · {len(df)} stocks analysed")
 
 # ── Tab Layout with auto-navigation ──
-# Check if we need to auto-switch to Deep Dive
-auto_tab = st.query_params.get("tab", None)
-if auto_tab == "deep_dive":
-    default_tab_idx = 1  # Deep Dive tab
-    st.query_params.clear()
-else:
-    default_tab_idx = 0
+if 'selected_ticker' not in st.session_state:
+    st.session_state.selected_ticker = 'AAPL'
+if 'navigate_to_deep_dive' not in st.session_state:
+    st.session_state.navigate_to_deep_dive = False
+
+# If navigating from Rankings, show Deep Dive as the main view
+if st.session_state.navigate_to_deep_dive:
+    st.session_state.navigate_to_deep_dive = False
+    selected = st.session_state.selected_ticker
+
+    # Back button
+    if st.button("← Back to Rankings", key="back_to_rankings"):
+        st.rerun()
+
+    r = df.loc[selected]
+    cs, ws, cb = r['combs_score'], r['weschler_score'], r['combined_score']
+    wq = r.get('weschler_quality', 0)
+    v_label, v_desc = verdict(cs, ws, cb, wq)
+
+    st.markdown(f"# 🎯 {selected} — {r.get('company', '')}")
+    st.markdown(f"**{r.get('sector', '')}** · Market Cap: ${r['market_cap']/1e9:.1f}B" if not pd.isna(r['market_cap']) else "")
+
+    desc = r.get('description', '')
+    if isinstance(desc, str) and len(desc) > 10:
+        with st.expander("Business Description"):
+            st.write(desc)
+
+    if "HIGH CONVICTION" in v_label:
+        st.success(f"**{v_label}** — {v_desc}")
+    elif "RESEARCH" in v_label:
+        st.warning(f"**{v_label}** — {v_desc}")
+    elif "MONITOR" in v_label:
+        st.info(f"**{v_label}** — {v_desc}")
+    else:
+        st.error(f"**{v_label}** — {v_desc}")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Combs Score", f"{cs:.1f}/100", delta=f"{signal(cs,65,45)}")
+    col2.metric("Weschler Score", f"{ws:.1f}/100", delta=f"{signal(ws,60,40)}")
+    col3.metric("Combined Score", f"{cb:.1f}/100", delta=f"{signal(cb,60,50)}")
+
+    st.markdown("---")
+
+    left, right = st.columns(2)
+    with left:
+        st.markdown("### 🎯 Combs — *Great business?*")
+        for name, val, mx, g, y in [("Unit Economics", r['combs_unit_economics'], 25, 18, 12), ("Frictionless Ops", r['combs_frictionless'], 25, 18, 12), ("Capital Allocation", r['combs_capital_allocation'], 25, 18, 12), ("Moat Strength", r['combs_moat'], 25, 18, 12)]:
+            st.markdown(f"{signal(val, g, y)} **{name}**: {val:.1f}/{mx}")
+        st.markdown("**Key Metrics:**")
+        for name, val, is_pct in [("★ ROIC", r.get('roic'), True), ("★ Gross Margin", r.get('gross_margin'), True), ("★ Op Margin", r.get('operating_margin'), True), ("ROE", r.get('roe'), True), ("FCF Yield", r.get('fcf_yield'), True), ("★ Rev CAGR 3y", r.get('revenue_cagr_3y'), True)]:
+            if not pd.isna(val):
+                st.markdown(f"- {name}: `{fmt_pct(val) if is_pct else f'{val:.4f}'}`")
+
+    with right:
+        st.markdown("### 🔍 Weschler — *Mispriced?*")
+        for name, val, mx, g, y in [("Variant Perception", r['weschler_variant'], 20, 14, 8), ("Complexity Discount", r['weschler_complexity'], 20, 14, 8), ("Distressed Value", r['weschler_distressed'], 20, 14, 8), ("Business Quality", r['weschler_quality'], 20, 14, 8), ("LT Compounding", r['weschler_compounding'], 20, 14, 8)]:
+            extra = " ← quality concern" if name == "Business Quality" and val < 10 else ""
+            st.markdown(f"{signal(val, g, y)} **{name}**: {val:.1f}/{mx}{extra}")
+        st.markdown("**Key Metrics:**")
+        for name, val, is_pct in [("★ 52w Drawdown", r.get('drawdown_52w'), True), ("vs 200d MA", r.get('price_vs_200ma'), True), ("★ PE", r.get('trailing_pe'), False), ("Short Interest", r.get('short_percent'), True), ("★ Earn CAGR 5y", r.get('earnings_cagr_5y'), True)]:
+            if not pd.isna(val):
+                st.markdown(f"- {name}: `{fmt_pct(val) if is_pct else f'{val:.2f}'}`")
+
+    sector = r.get('sector')
+    if sector and not pd.isna(sector):
+        peers = df[df['sector'] == sector]
+        cr = int((peers['combs_score'] >= cs).sum())
+        wr = int((peers['weschler_score'] >= ws).sum())
+        st.markdown(f"**Sector Rank** ({sector}, {len(peers)} peers): Combs #{cr} · Weschler #{wr}")
+
+    st.stop()
 
 tab_names = ["🏆 Rankings", "🎯 Deep Dive", "📈 Scatter Plot", "🔥 Conviction", "📊 Sector Heatmap"]
 tab1, tab2, tab3, tab4, tab5 = st.tabs(tab_names)
-
-# Shared state for cross-tab navigation
-if 'selected_ticker' not in st.session_state:
-    st.session_state.selected_ticker = 'AAPL'
 
 # ══════════════════════════════════════════════
 # TAB 1: Rankings
@@ -174,7 +234,7 @@ with tab1:
             with col_btn:
                 if st.button(f"#{i}\n**{ticker}**", key=f"rank_{ticker}", use_container_width=True):
                     st.session_state.selected_ticker = ticker
-                    st.query_params["tab"] = "deep_dive"
+                    st.session_state.navigate_to_deep_dive = True
                     st.rerun()
             with col_info:
                 st.markdown(f"**{str(row.get('company',''))[:35]}** · {str(row.get('sector',''))[:20]}")
