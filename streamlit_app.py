@@ -42,6 +42,12 @@ def verdict(combs, weschler, combined, quality):
 def fmt_pct(val):
     return f"{val*100:.1f}%" if not pd.isna(val) else "—"
 
+def _score_color_str(val, green, yellow):
+    if pd.isna(val): return '#999'
+    if val >= green: return '#2e7d32'
+    if val >= yellow: return '#f57f17'
+    return '#c62828'
+
 def fmt_score(val, max_val):
     return f"{val:.1f}/{max_val}" if not pd.isna(val) else "—"
 
@@ -110,6 +116,10 @@ st.caption(f"Last updated: {last_modified} · {len(df)} stocks analysed")
 # ── Tab Layout ──
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏆 Rankings", "🎯 Deep Dive", "📈 Scatter Plot", "🔥 Conviction", "📊 Sector Heatmap"])
 
+# Shared state for cross-tab navigation
+if 'selected_ticker' not in st.session_state:
+    st.session_state.selected_ticker = 'AAPL'
+
 # ══════════════════════════════════════════════
 # TAB 1: Rankings
 # ══════════════════════════════════════════════
@@ -136,28 +146,52 @@ with tab1:
     top_n = st.slider("Show top N:", 10, 50, 20)
     ranking = filtered.nlargest(top_n, score_col)[['company','sector','combs_score','weschler_score','combined_score','trailing_pe','roic','fcf_yield','operating_margin','drawdown_52w','revenue_cagr_3y']].copy()
 
-    ranking['roic'] = ranking['roic'].apply(lambda x: fmt_pct(x))
-    ranking['fcf_yield'] = ranking['fcf_yield'].apply(lambda x: fmt_pct(x))
-    ranking['operating_margin'] = ranking['operating_margin'].apply(lambda x: fmt_pct(x))
-    ranking['drawdown_52w'] = ranking['drawdown_52w'].apply(lambda x: fmt_pct(x))
-    ranking['revenue_cagr_3y'] = ranking['revenue_cagr_3y'].apply(lambda x: fmt_pct(x))
-    ranking['trailing_pe'] = ranking['trailing_pe'].apply(lambda x: f"{x:.1f}" if not pd.isna(x) else "—")
+    # Render as interactive table with clickable tickers
+    st.markdown("*Click any ticker to open its Deep Dive*")
 
-    ranking.columns = ['Company','Sector','Combs','Weschler','Combined','PE','ROIC','FCF Yield','Op Margin','52w Draw','Rev CAGR 3y']
+    # Table header
+    header_cols = st.columns([1, 2.5, 1.5, 0.8, 0.8, 0.8, 0.7, 0.8, 0.8, 0.8, 0.8, 0.9])
+    headers = ['#', 'Company', 'Sector', 'Combs', 'Wesch', 'Comb', 'PE', 'ROIC', 'FCF%', 'OpMar', '52wDr', 'RevGr']
+    for col, h in zip(header_cols, headers):
+        col.markdown(f"**{h}**")
 
-    st.dataframe(
-        ranking.style.background_gradient(subset=['Combs','Weschler','Combined'], cmap='RdYlGn', vmin=30, vmax=75),
-        use_container_width=True,
-        height=700
-    )
+    st.markdown("---")
+
+    for i, (ticker, row) in enumerate(ranking.iterrows(), 1):
+        cols = st.columns([1, 2.5, 1.5, 0.8, 0.8, 0.8, 0.7, 0.8, 0.8, 0.8, 0.8, 0.9])
+
+        # Ticker button — clicking sets the selected ticker and user can switch to Deep Dive tab
+        if cols[0].button(f"**{ticker}**", key=f"rank_{ticker}", help=f"Deep dive {ticker}"):
+            st.session_state.selected_ticker = ticker
+            st.toast(f"🎯 {ticker} selected — switch to Deep Dive tab", icon="🎯")
+
+        cols[1].caption(str(row.get('company', ''))[:25])
+        cols[2].caption(str(row.get('sector', ''))[:15])
+
+        # Colour-coded scores
+        cs, ws, cb = row['combs_score'], row['weschler_score'], row['combined_score']
+        cols[3].markdown(f"<span style='color:{_score_color_str(cs, 65, 45)};font-weight:700'>{cs:.0f}</span>", unsafe_allow_html=True)
+        cols[4].markdown(f"<span style='color:{_score_color_str(ws, 60, 40)};font-weight:700'>{ws:.0f}</span>", unsafe_allow_html=True)
+        cols[5].markdown(f"<span style='color:{_score_color_str(cb, 60, 50)};font-weight:700'>{cb:.1f}</span>", unsafe_allow_html=True)
+
+        cols[6].caption(f"{row['trailing_pe']:.0f}" if not pd.isna(row['trailing_pe']) else "—")
+        cols[7].caption(fmt_pct(row.get('roic')))
+        cols[8].caption(fmt_pct(row.get('fcf_yield')))
+        cols[9].caption(fmt_pct(row.get('operating_margin')))
+        cols[10].caption(fmt_pct(row.get('drawdown_52w')))
+        cols[11].caption(fmt_pct(row.get('revenue_cagr_3y')))
 
 # ══════════════════════════════════════════════
 # TAB 2: Deep Dive
 # ══════════════════════════════════════════════
 with tab2:
     ticker_options = sorted(df.index.tolist())
-    default_idx = ticker_options.index('AAPL') if 'AAPL' in ticker_options else 0
+    # Use session state ticker if set from Rankings tab
+    default_ticker = st.session_state.get('selected_ticker', 'AAPL')
+    default_idx = ticker_options.index(default_ticker) if default_ticker in ticker_options else 0
     selected = st.selectbox("Select ticker:", ticker_options, index=default_idx, key="deep_dive_ticker")
+    # Sync back to session state
+    st.session_state.selected_ticker = selected
 
     if selected and selected in df.index:
         r = df.loc[selected]
