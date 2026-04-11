@@ -283,6 +283,35 @@ with tab3:
     fig.update_layout(height=700, legend=dict(orientation="h", yanchor="bottom", y=-0.2))
     st.plotly_chart(fig, use_container_width=True)
 
+    # Zoom controls
+    if 'scatter_zoom' not in st.session_state:
+        st.session_state.scatter_zoom = 1.0
+
+    zc1, zc2, zc3 = st.columns([1, 1, 1])
+    with zc1:
+        if st.button("🔍+ Zoom In", key="zoom_in", use_container_width=True):
+            st.session_state.scatter_zoom = min(st.session_state.scatter_zoom * 1.5, 8.0)
+            st.rerun()
+    with zc2:
+        if st.button("🔍− Zoom Out", key="zoom_out", use_container_width=True):
+            st.session_state.scatter_zoom = max(st.session_state.scatter_zoom / 1.5, 0.5)
+            st.rerun()
+    with zc3:
+        if st.button("↺ Reset", key="zoom_reset", use_container_width=True):
+            st.session_state.scatter_zoom = 1.0
+            st.rerun()
+
+    # Apply zoom by adjusting axis range
+    if st.session_state.scatter_zoom != 1.0:
+        z = st.session_state.scatter_zoom
+        cx = plot_df['combs_score'].median()
+        cy = plot_df['weschler_score'].median()
+        x_range = (plot_df['combs_score'].max() - plot_df['combs_score'].min()) / z
+        y_range = (plot_df['weschler_score'].max() - plot_df['weschler_score'].min()) / z
+        fig.update_xaxes(range=[cx - x_range/2, cx + x_range/2])
+        fig.update_yaxes(range=[cy - y_range/2, cy + y_range/2])
+        st.plotly_chart(fig, use_container_width=True)
+
     # Ticker selection for deep dive
     st.markdown("---")
     scatter_ticker = st.selectbox(
