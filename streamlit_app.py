@@ -280,32 +280,13 @@ with tab3:
     for t, row in plot_df.nlargest(10, 'combined_score').iterrows():
         fig.add_annotation(x=row['combs_score'], y=row['weschler_score'], text=t, showarrow=True, arrowhead=0, ax=15, ay=-15, font=dict(size=10, color="black"))
 
-    # 3) Render as raw HTML for native mobile touch (pinch-zoom, pan)
-    import plotly.io as pio
-    chart_html = pio.to_html(
-        fig,
-        full_html=False,
-        include_plotlyjs='cdn',
-        config={
-            "scrollZoom": True,
-            "displayModeBar": True,
-            "modeBarButtonsToRemove": ["select2d", "lasso2d"],
-            "displaylogo": False,
-        }
-    )
-    # Wrap in responsive container with touch-action CSS
-    full_html = f"""
-    <div style="width:100%; overflow:hidden; touch-action:none;">
-        {chart_html}
-    </div>
-    """
-    import streamlit.components.v1 as components
-    components.html(full_html, height=720, scrolling=False)
+    fig.update_layout(height=700, legend=dict(orientation="h", yanchor="bottom", y=-0.2))
+    st.plotly_chart(fig, use_container_width=True)
 
-    # Manual ticker selection for deep dive (works on mobile)
+    # Ticker selection for deep dive
     st.markdown("---")
     scatter_ticker = st.selectbox(
-        "Select a stock from the chart to deep dive:",
+        "Select a stock to deep dive:",
         ["— Select —"] + sorted(plot_df.index.tolist()),
         key="scatter_select"
     )
