@@ -2,10 +2,11 @@ name: Weekly Screener Run
 
 on:
   schedule:
-    # Every Saturday at 08:00 UTC (adjust for your timezone)
     - cron: '0 8 * * 6'
   workflow_dispatch:
-    # Allow manual trigger from GitHub Actions UI
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
   contents: write
@@ -13,7 +14,7 @@ permissions:
 jobs:
   run-screener:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repo
@@ -23,7 +24,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -32,63 +32,304 @@ jobs:
       - name: Install Jupyter kernel
         run: python -m ipykernel install --user --name python3
 
-      - name: Delete cache (force fresh data)
+      - name: Delete cache
         run: rm -f data/sp500_cache.pkl data/analysis_results.pkl
 
-      - name: Run notebook
+      - name: Run screener as Python script
         env:
           CW_SMTP_USER: ${{ secrets.CW_SMTP_USER }}
           CW_SMTP_PASS: ${{ secrets.CW_SMTP_PASS }}
         run: |
-          python -c "
-          import nbformat
-          from nbclient import NotebookClient
+          python << 'PYSCRIPT'
+          import warnings
+          warnings.filterwarnings('ignore')
+          import yfinance as yf
+          import pandas as pd
+          import numpy as np
+          import matplotlib
+          matplotlib.use('Agg')
+          import matplotlib.pyplot as plt
+          import seaborn as sns
+          from scipy import stats
+          import os, pickle, time, smtplib
+          from datetime import datetime, timedelta
+          from email.mime.text import MIMEText
+          from email.mime.multipart import MIMEMultipart
 
-          nb = nbformat.read('combs_weschler_screener.ipynb', as_version=4)
-          for cell in nb.cells:
-              if cell.cell_type == 'code':
-                  cell.outputs = []
-                  cell.execution_count = None
+          DATA_DIR = 'data'
+          OUTPUT_DIR = 'output'
+          CACHE_FILE = os.path.join(DATA_DIR, 'sp500_cache.pkl')
+          os.makedirs(DATA_DIR, exist_ok=True)
+          os.makedirs(os.path.join(OUTPUT_DIR, 'history'), exist_ok=True)
 
-          client = NotebookClient(nb, timeout=1200, kernel_name='python3')
-          try:
-              client.execute()
-              nbformat.write(nb, 'combs_weschler_screener.ipynb')
-              print('SUCCESS: Notebook executed')
-          except Exception as e:
-              nbformat.write(nb, 'combs_weschler_screener.ipynb')
-              print(f'ERROR: {e}')
-              raise
-          "
+          # ── S&P 500 tickers ──
+          print('Step 1: Loading tickers...')
+          csv_path = os.path.join(DATA_DIR, 'sp500_full_list.csv')
+          if os.path.exists(csv_path):
+              sp500_df = pd.read_csv(csv_path)
+              print(f'  Loaded {len(sp500_df)} tickers from CSV')
+          else:
+              try:
+                  import requests as req
+                  import io
+                  headers = {'User-Agent': 'Mozilla/5.0'}
+                  resp = req.get('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies', headers=headers)
+                  tables = pd.read_html(io.StringIO(resp.text))
+                  sp500_df = tables[0][['Symbol','Security','GICS Sector','GICS Sub-Industry']].copy()
+                  sp500_df['Symbol'] = sp500_df['Symbol'].str.replace('.', '-', regex=False)
+                  sp500_df.to_csv(csv_path, index=False)
+                  print(f'  Fetched {len(sp500_df)} tickers from Wikipedia')
+              except Exception as e:
+                  print(f'  ERROR fetching tickers: {e}')
+                  exit(1)
 
-      - name: Export CSV for Streamlit
-        run: |
-          python -c "
-          import pickle, pandas as pd
-          with open('data/analysis_results.pkl', 'rb') as f:
-              df = pickle.load(f)
-          export_cols = ['company','sector','market_cap','description',
-              'combs_score','weschler_score','combined_score',
-              'combs_unit_economics','combs_frictionless','combs_capital_allocation','combs_moat',
-              'weschler_variant','weschler_complexity','weschler_distressed','weschler_quality','weschler_compounding',
-              'combs_style_flag','weschler_style_flag',
-              'trailing_pe','forward_pe','peg_ratio','price_to_book','price_to_sales',
-              'roic','roe','fcf_yield','gross_margin','operating_margin','net_margin',
-              'revenue_cagr_3y','revenue_cagr_5y','earnings_cagr_3y','earnings_cagr_5y',
-              'debt_to_equity','interest_coverage','altman_z',
-              'drawdown_52w','price_vs_200ma','current_price',
-              'short_percent','analyst_count','dividend_yield',
-              'margin_stability','margin_trend','earnings_consistency','revenue_stability',
-              'book_value_growth','reinvestment_rate','pe_gap','beta']
-          avail = [c for c in export_cols if c in df.columns]
-          df[avail].to_csv('data/screener_results.csv')
-          print(f'Exported {len(df)} stocks')
-          "
+          # ── Fetch data ──
+          print('Step 2: Fetching financial data...')
+          sector_map = dict(zip(sp500_df['Symbol'], sp500_df['GICS Sector']))
+          all_data = {}
+          failed = []
+          symbols = sp500_df['Symbol'].tolist()
+          for i, ticker in enumerate(symbols):
+              if (i+1) % 50 == 0 or i == 0:
+                  print(f'  Progress: {i+1}/{len(symbols)}')
+              try:
+                  t = yf.Ticker(ticker)
+                  all_data[ticker] = {'info': t.info or {}, 'financials': t.financials, 'balance_sheet': t.balance_sheet, 'cashflow': t.cashflow, 'history': t.history(period='5y', interval='1mo')}
+              except Exception:
+                  failed.append(ticker)
+              if (i+1) % 50 == 0:
+                  time.sleep(2)
+          print(f'  Fetched: {len(all_data)}/{len(symbols)}, Failed: {len(failed)}')
+          with open(CACHE_FILE, 'wb') as f:
+              pickle.dump(all_data, f)
+
+          # ── Compute metrics ──
+          print('Step 3: Computing metrics...')
+          def safe_get(info, key, default=np.nan):
+              val = info.get(key, default)
+              return np.nan if val is None or val in ('Infinity', '-Infinity') else val
+          def calc_cagr(s, y):
+              if s is None or len(s) < 2: return np.nan
+              f, l = s.iloc[-1], s.iloc[0]
+              if f <= 0 or l <= 0: return np.nan
+              return (l/f)**(1/y)-1
+          def safe_div(n, d):
+              if pd.isna(n) or pd.isna(d) or d == 0: return np.nan
+              return n/d
+
+          metrics_list = []
+          for ticker, data in all_data.items():
+              try:
+                  info = data.get('info', {})
+                  fin, bs, cf, hist = data.get('financials'), data.get('balance_sheet'), data.get('cashflow'), data.get('history')
+                  m = {'ticker': ticker, 'company': safe_get(info,'longName',ticker), 'sector': sector_map.get(ticker, safe_get(info,'sector','Unknown')),
+                       'market_cap': safe_get(info,'marketCap'), 'description': safe_get(info,'longBusinessSummary',''),
+                       'trailing_pe': safe_get(info,'trailingPE'), 'forward_pe': safe_get(info,'forwardPE'),
+                       'peg_ratio': safe_get(info,'pegRatio'), 'price_to_book': safe_get(info,'priceToBook'),
+                       'dividend_yield': safe_get(info,'dividendYield',0), 'short_percent': safe_get(info,'shortPercentOfFloat'),
+                       'analyst_count': safe_get(info,'numberOfAnalystOpinions'), 'beta': safe_get(info,'beta')}
+                  if fin is not None and not fin.empty:
+                      rev = fin.loc['Total Revenue'] if 'Total Revenue' in fin.index else None
+                      ni = fin.loc['Net Income'] if 'Net Income' in fin.index else None
+                      gp = fin.loc['Gross Profit'] if 'Gross Profit' in fin.index else None
+                      oi = fin.loc['Operating Income'] if 'Operating Income' in fin.index else None
+                      lr = rev.iloc[0] if rev is not None and len(rev)>0 else np.nan
+                      lni = ni.iloc[0] if ni is not None and len(ni)>0 else np.nan
+                      lgp = gp.iloc[0] if gp is not None and len(gp)>0 else np.nan
+                      loi = oi.iloc[0] if oi is not None and len(oi)>0 else np.nan
+                      m['gross_margin'] = safe_div(lgp, lr); m['operating_margin'] = safe_div(loi, lr); m['net_margin'] = safe_div(lni, lr)
+                      if oi is not None and rev is not None and len(oi)>=3:
+                          opm = (oi/rev).dropna()
+                          m['margin_stability'] = opm.std() if len(opm)>=3 else np.nan
+                          m['margin_trend'] = (opm.iloc[0]-opm.iloc[-1]) if len(opm)>=2 else np.nan
+                      else: m['margin_stability']=m['margin_trend']=np.nan
+                      if rev is not None and len(rev)>=3:
+                          m['revenue_cagr_3y'] = calc_cagr(rev.iloc[:min(4,len(rev))], min(len(rev)-1,3))
+                          m['revenue_cagr_5y'] = calc_cagr(rev, min(len(rev)-1,5))
+                          rg = safe_div(rev.iloc[0]-rev.iloc[1], abs(rev.iloc[1]))
+                          og = safe_div(rev.iloc[1]-rev.iloc[2], abs(rev.iloc[2]))
+                          m['revenue_acceleration'] = (rg-og) if not pd.isna(rg) and not pd.isna(og) else np.nan
+                      else: m['revenue_cagr_3y']=m['revenue_cagr_5y']=m['revenue_acceleration']=np.nan
+                      if ni is not None and len(ni)>=3:
+                          m['earnings_cagr_3y'] = calc_cagr(ni.iloc[:min(4,len(ni))], min(len(ni)-1,3))
+                          m['earnings_cagr_5y'] = calc_cagr(ni, min(len(ni)-1,5))
+                      else: m['earnings_cagr_3y']=m['earnings_cagr_5y']=np.nan
+                      ie=None
+                      for lab in ['Interest Expense','Interest Expense Non Operating']:
+                          if lab in fin.index: ie=abs(fin.loc[lab].iloc[0]); break
+                      m['interest_coverage'] = safe_div(loi, ie) if ie else np.nan
+                      if ni is not None and len(ni)>=3:
+                          nim=ni.mean(); m['earnings_consistency'] = 1-min(1,abs(safe_div(ni.std(),nim))) if nim!=0 else np.nan
+                      else: m['earnings_consistency']=np.nan
+                      if rev is not None and len(rev)>=3:
+                          rm=rev.mean(); m['revenue_stability'] = 1-min(1,abs(safe_div(rev.std(),rm))) if rm!=0 else np.nan
+                      else: m['revenue_stability']=np.nan
+                  else:
+                      for k in ['gross_margin','operating_margin','net_margin','margin_stability','margin_trend','revenue_cagr_3y','revenue_cagr_5y','revenue_acceleration','earnings_cagr_3y','earnings_cagr_5y','interest_coverage','earnings_consistency','revenue_stability']:
+                          m[k]=np.nan
+                  if bs is not None and not bs.empty:
+                      te = bs.loc['Stockholders Equity'].iloc[0] if 'Stockholders Equity' in bs.index else np.nan
+                      td=None
+                      for lab in ['Total Debt','Long Term Debt']:
+                          if lab in bs.index: td=bs.loc[lab].iloc[0]; break
+                      m['debt_to_equity'] = safe_div(td, te)
+                      m['roe'] = safe_div(fin.loc['Net Income'].iloc[0], te) if fin is not None and 'Net Income' in fin.index else np.nan
+                      cash=np.nan
+                      for lab in ['Cash And Cash Equivalents','Cash Cash Equivalents And Short Term Investments']:
+                          if lab in bs.index: cash=bs.loc[lab].iloc[0]; break
+                      ic = (te if not pd.isna(te) else 0)+(td if not pd.isna(td) else 0)-(cash if not pd.isna(cash) else 0)
+                      tr=0.21
+                      if fin is not None and 'Tax Provision' in fin.index and 'Pretax Income' in fin.index:
+                          pt,tp = fin.loc['Pretax Income'].iloc[0], fin.loc['Tax Provision'].iloc[0]
+                          if pt>0: x=safe_div(tp,pt); tr=x if not pd.isna(x) else 0.21
+                      oi_v = fin.loc['Operating Income'].iloc[0] if fin is not None and 'Operating Income' in fin.index else np.nan
+                      nopat = oi_v*(1-tr) if not pd.isna(oi_v) else np.nan
+                      m['roic'] = safe_div(nopat, ic) if ic>0 else np.nan
+                      re = bs.loc['Retained Earnings'].iloc[0] if 'Retained Earnings' in bs.index else np.nan
+                      tl = bs.loc['Total Liabilities Net Minority Interest'].iloc[0] if 'Total Liabilities Net Minority Interest' in bs.index else np.nan
+                      ta = bs.loc['Total Assets'].iloc[0] if 'Total Assets' in bs.index else np.nan
+                      ca = bs.loc['Current Assets'].iloc[0] if 'Current Assets' in bs.index else np.nan
+                      cl = bs.loc['Current Liabilities'].iloc[0] if 'Current Liabilities' in bs.index else np.nan
+                      eb = fin.loc['EBIT'].iloc[0] if fin is not None and 'EBIT' in fin.index else np.nan
+                      rv = fin.loc['Total Revenue'].iloc[0] if fin is not None and 'Total Revenue' in fin.index else np.nan
+                      mc = m.get('market_cap',np.nan)
+                      wc = (ca-cl) if not pd.isna(ca) and not pd.isna(cl) else np.nan
+                      if not pd.isna(ta) and ta>0:
+                          cs=[safe_div(wc,ta)*1.2,safe_div(re,ta)*1.4,safe_div(eb,ta)*3.3,safe_div(mc,tl)*0.6 if not pd.isna(tl) else np.nan,safe_div(rv,ta)*1.0]
+                          m['altman_z']=sum(cs) if all(not pd.isna(c) for c in cs) else np.nan
+                      else: m['altman_z']=np.nan
+                      if 'Stockholders Equity' in bs.index and len(bs.loc['Stockholders Equity'].dropna())>=2:
+                          eqs=bs.loc['Stockholders Equity'].dropna(); m['book_value_growth']=calc_cagr(eqs,len(eqs)-1)
+                      else: m['book_value_growth']=np.nan
+                  else:
+                      for k in ['debt_to_equity','roe','roic','altman_z','book_value_growth']: m[k]=np.nan
+                  if cf is not None and not cf.empty:
+                      ocf = cf.loc['Operating Cash Flow'].iloc[0] if 'Operating Cash Flow' in cf.index else np.nan
+                      cx = abs(cf.loc['Capital Expenditure'].iloc[0]) if 'Capital Expenditure' in cf.index else 0
+                      fcf = ocf-cx if not pd.isna(ocf) else np.nan
+                      m['fcf']=fcf; m['fcf_yield']=safe_div(fcf,m.get('market_cap',np.nan))
+                      rfr = fin.loc['Total Revenue'].iloc[0] if fin is not None and 'Total Revenue' in fin.index else np.nan
+                      rnd=0
+                      for lab in ['Research And Development','Research Development']:
+                          if fin is not None and lab in fin.index: rnd=fin.loc[lab].iloc[0]; break
+                      m['reinvestment_rate'] = safe_div(cx+(rnd if not pd.isna(rnd) else 0), rfr)
+                  else: m['fcf']=m['fcf_yield']=m['reinvestment_rate']=np.nan
+                  if hist is not None and not hist.empty and len(hist)>5:
+                      prices = hist['Close'].dropna()
+                      if len(prices)>0:
+                          cp=prices.iloc[-1]; pk=prices.tail(12).max()
+                          m['drawdown_52w'] = (cp-pk)/pk if pk>0 else np.nan
+                          ma200=prices.tail(10).mean(); m['price_vs_200ma']=safe_div(cp-ma200,ma200)
+                          m['current_price']=cp
+                      else: m['drawdown_52w']=m['price_vs_200ma']=m['current_price']=np.nan
+                  else: m['drawdown_52w']=m['price_vs_200ma']=m['current_price']=np.nan
+                  m['pe_gap'] = safe_div(m['forward_pe']-m['trailing_pe'],m['trailing_pe']) if not pd.isna(m['trailing_pe']) and m['trailing_pe']>0 else np.nan
+                  metrics_list.append(m)
+              except Exception:
+                  pass
+
+          df = pd.DataFrame(metrics_list).set_index('ticker')
+          print(f'  Metrics: {len(df)} stocks')
+
+          # ── Scoring ──
+          print('Step 4: Scoring...')
+          def pr(series, ascending=True):
+              if ascending: return series.rank(pct=True, na_option='keep').fillna(0.5) * 100
+              else: return (1 - series.rank(pct=True, na_option='keep').fillna(0.5)) * 100
+          def sector_relative(df, col):
+              return df[col] - df.groupby('sector')[col].transform('median')
+
+          df['combs_unit_economics'] = (pr(df['gross_margin'])*0.30+pr(df['operating_margin'])*0.30+pr(df['net_margin'])*0.20+pr(df['margin_stability'],False)*0.20)/100*25
+          df['combs_frictionless'] = (pr(df['revenue_cagr_3y'])*0.40+pr(df['revenue_acceleration'])*0.30+pr(sector_relative(df,'market_cap'))*0.30)/100*25
+          df['combs_capital_allocation'] = (pr(df['roic'])*0.35+pr(df['roe'])*0.25+pr(df['fcf_yield'])*0.25+pr(df['reinvestment_rate'])*0.15)/100*25
+          df['combs_moat'] = (pr(df['margin_stability'],False)*0.35+pr(df['margin_trend'])*0.30+pr(sector_relative(df,'operating_margin'))*0.35)/100*25
+          df['combs_score'] = df['combs_unit_economics']+df['combs_frictionless']+df['combs_capital_allocation']+df['combs_moat']
+          df['combs_style_flag'] = (df['combs_score']>=df['combs_score'].quantile(0.90))|((df['combs_score']>=df['combs_score'].quantile(0.80))&(df['sector'].isin(['Financials','Information Technology','Communication Services'])))
+
+          altman_grey = ((df['altman_z']>=1.0)&(df['altman_z']<=3.0)).astype(float)*100
+          df['weschler_variant'] = (pr(df['pe_gap'].abs())*0.35+pr(sector_relative(df,'trailing_pe'),False)*0.35+pr(df['peg_ratio'],False)*0.30)/100*20
+          df['weschler_complexity'] = (pr(df['analyst_count'],False)*0.30+pr(df['short_percent'])*0.25+altman_grey.fillna(0)*0.20+pr(sector_relative(df,'price_to_book'),False)*0.25)/100*20
+          df['weschler_distressed'] = (pr(df['drawdown_52w'],False)*0.30+pr(df['price_vs_200ma'],False)*0.25+pr(df['fcf_yield'])*0.25+pr(df['price_to_book'],False)*0.20)/100*20
+          df['weschler_quality'] = (pr(df['roic'])*0.30+pr(df['earnings_consistency'])*0.25+pr(df['revenue_stability'])*0.25+pr(df['interest_coverage'])*0.20)/100*20
+          df['weschler_compounding'] = (pr(df['earnings_cagr_5y'])*0.30+pr(df['revenue_cagr_5y'])*0.30+pr(df['dividend_yield'])*0.15+pr(df['book_value_growth'])*0.25)/100*20
+          df['weschler_score'] = df['weschler_variant']+df['weschler_complexity']+df['weschler_distressed']+df['weschler_quality']+df['weschler_compounding']
+          df['weschler_style_flag'] = (df['weschler_quality']>15)&(df['weschler_distressed']>15)
+          df['combined_score'] = (df['combs_score']+df['weschler_score'])/2
+
+          print(f'  Combs: {df["combs_score"].min():.1f} – {df["combs_score"].max():.1f}')
+          print(f'  Weschler: {df["weschler_score"].min():.1f} – {df["weschler_score"].max():.1f}')
+          print(f'  Top: {df["combined_score"].idxmax()} ({df["combined_score"].max():.1f})')
+
+          # ── Save results ──
+          print('Step 5: Saving results...')
+          with open(os.path.join(DATA_DIR, 'analysis_results.pkl'), 'wb') as f:
+              pickle.dump(df, f)
+          export_cols = [c for c in df.columns if c != 'description']
+          df[export_cols].to_csv(os.path.join(DATA_DIR, 'screener_results.csv'))
+
+          # ── Save snapshot ──
+          run_date = datetime.now().strftime('%Y-%m-%d')
+          snapshot = df.copy()
+          snapshot['run_date'] = run_date
+          snapshot['ticker'] = snapshot.index
+          history_file = os.path.join(OUTPUT_DIR, 'history', 'score_history.csv')
+          if os.path.exists(history_file):
+              existing = pd.read_csv(history_file)
+              existing = existing[existing['run_date'] != run_date]
+              combined = pd.concat([existing, snapshot.reset_index(drop=True)], ignore_index=True)
+          else:
+              combined = snapshot.reset_index(drop=True)
+          combined.to_csv(history_file, index=False)
+          snapshot.to_csv(os.path.join(OUTPUT_DIR, 'history', f'snapshot_{run_date}.csv'))
+
+          # ── Watchlist ──
+          wl_cols = ['company','sector','market_cap','combs_score','weschler_score','combined_score','trailing_pe','roic','fcf_yield','drawdown_52w','combs_style_flag','weschler_style_flag']
+          avail = [c for c in wl_cols if c in df.columns]
+          top50 = df.nlargest(50, 'combined_score')[avail].copy()
+          top50['timestamp'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+          top50.to_csv(os.path.join(OUTPUT_DIR, 'watchlist.csv'))
+
+          # ── Email ──
+          print('Step 6: Sending email...')
+          smtp_user = os.environ.get('CW_SMTP_USER', '')
+          smtp_pass = os.environ.get('CW_SMTP_PASS', '')
+          if smtp_user and smtp_pass:
+              best = df['combined_score'].idxmax()
+              conviction = df[(df['combs_score']>=60)&(df['weschler_score']>=60)].sort_values('combined_score', ascending=False)
+              body = f'Combs-Weschler Weekly Report — {run_date}\n\n'
+              body += f'Stocks: {len(df)} | Top: {best} ({df.loc[best,"combined_score"]:.1f})\n'
+              body += f'Conviction (C>=60 & W>=60): {len(conviction)}\n\n'
+              body += 'Top 10 Combined:\n'
+              for i,(t,r) in enumerate(df.nlargest(10,'combined_score').iterrows(),1):
+                  body += f'  {i}. {t} C:{r["combs_score"]:.0f} W:{r["weschler_score"]:.0f} Comb:{r["combined_score"]:.1f}\n'
+              body += '\nTop 10 Combs:\n'
+              for i,(t,r) in enumerate(df.nlargest(10,'combs_score').iterrows(),1):
+                  body += f'  {i}. {t} {r["combs_score"]:.1f}\n'
+              body += '\nTop 10 Weschler:\n'
+              for i,(t,r) in enumerate(df.nlargest(10,'weschler_score').iterrows(),1):
+                  body += f'  {i}. {t} {r["weschler_score"]:.1f}\n'
+              try:
+                  msg = MIMEText(body)
+                  msg['Subject'] = f'[CW Screener] Weekly Report — {run_date}'
+                  msg['From'] = smtp_user
+                  msg['To'] = smtp_user
+                  with smtplib.SMTP('smtp.gmail.com', 587) as server:
+                      server.starttls()
+                      server.login(smtp_user, smtp_pass)
+                      server.sendmail(smtp_user, smtp_user, msg.as_string())
+                  print('  Email sent!')
+              except Exception as e:
+                  print(f'  Email failed: {e}')
+          else:
+              print('  No SMTP credentials — skipping email')
+
+          print('DONE')
+          PYSCRIPT
 
       - name: Commit and push results
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add data/screener_results.csv data/sp500_full_list.csv output/ combs_weschler_screener.ipynb
+          git add data/ output/
           git diff --cached --quiet || git commit -m "Weekly run: $(date +%Y-%m-%d)"
           git push
