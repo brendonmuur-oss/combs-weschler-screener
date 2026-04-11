@@ -1,0 +1,94 @@
+name: Weekly Screener Run
+
+on:
+  schedule:
+    # Every Saturday at 08:00 UTC (adjust for your timezone)
+    - cron: '0 8 * * 6'
+  workflow_dispatch:
+    # Allow manual trigger from GitHub Actions UI
+
+permissions:
+  contents: write
+
+jobs:
+  run-screener:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install yfinance pandas numpy matplotlib seaborn scipy lxml html5lib requests nbformat nbclient ipykernel jupyter_client
+
+      - name: Install Jupyter kernel
+        run: python -m ipykernel install --user --name python3
+
+      - name: Delete cache (force fresh data)
+        run: rm -f data/sp500_cache.pkl data/analysis_results.pkl
+
+      - name: Run notebook
+        env:
+          CW_SMTP_USER: ${{ secrets.CW_SMTP_USER }}
+          CW_SMTP_PASS: ${{ secrets.CW_SMTP_PASS }}
+        run: |
+          python -c "
+          import nbformat
+          from nbclient import NotebookClient
+
+          nb = nbformat.read('combs_weschler_screener.ipynb', as_version=4)
+          for cell in nb.cells:
+              if cell.cell_type == 'code':
+                  cell.outputs = []
+                  cell.execution_count = None
+
+          client = NotebookClient(nb, timeout=1200, kernel_name='python3')
+          try:
+              client.execute()
+              nbformat.write(nb, 'combs_weschler_screener.ipynb')
+              print('SUCCESS: Notebook executed')
+          except Exception as e:
+              nbformat.write(nb, 'combs_weschler_screener.ipynb')
+              print(f'ERROR: {e}')
+              raise
+          "
+
+      - name: Export CSV for Streamlit
+        run: |
+          python -c "
+          import pickle, pandas as pd
+          with open('data/analysis_results.pkl', 'rb') as f:
+              df = pickle.load(f)
+          export_cols = ['company','sector','market_cap','description',
+              'combs_score','weschler_score','combined_score',
+              'combs_unit_economics','combs_frictionless','combs_capital_allocation','combs_moat',
+              'weschler_variant','weschler_complexity','weschler_distressed','weschler_quality','weschler_compounding',
+              'combs_style_flag','weschler_style_flag',
+              'trailing_pe','forward_pe','peg_ratio','price_to_book','price_to_sales',
+              'roic','roe','fcf_yield','gross_margin','operating_margin','net_margin',
+              'revenue_cagr_3y','revenue_cagr_5y','earnings_cagr_3y','earnings_cagr_5y',
+              'debt_to_equity','interest_coverage','altman_z',
+              'drawdown_52w','price_vs_200ma','current_price',
+              'short_percent','analyst_count','dividend_yield',
+              'margin_stability','margin_trend','earnings_consistency','revenue_stability',
+              'book_value_growth','reinvestment_rate','pe_gap','beta']
+          avail = [c for c in export_cols if c in df.columns]
+          df[avail].to_csv('data/screener_results.csv')
+          print(f'Exported {len(df)} stocks')
+          "
+
+      - name: Commit and push results
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add data/screener_results.csv data/sp500_full_list.csv output/ combs_weschler_screener.ipynb
+          git diff --cached --quiet || git commit -m "Weekly run: $(date +%Y-%m-%d)"
+          git push
