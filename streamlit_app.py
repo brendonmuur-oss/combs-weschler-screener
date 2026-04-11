@@ -5,7 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 
-st.set_page_config(page_title="Combs-Weschler Screener", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Combs-Weschler Screener", layout="wide")
 
 # ── Load Data ──
 @st.cache_data(ttl=3600)
@@ -13,8 +13,7 @@ def load_data():
     paths = ['data/screener_results.csv', '/Users/brendonmuur/Desktop/data/screener_results.csv']
     for p in paths:
         if os.path.exists(p):
-            df = pd.read_csv(p, index_col=0)
-            return df
+            return pd.read_csv(p, index_col=0)
     st.error("No data found. Run the notebook first to generate data/screener_results.csv")
     st.stop()
 
@@ -51,87 +50,21 @@ def _score_color_str(val, green, yellow):
 def fmt_score(val, max_val):
     return f"{val:.1f}/{max_val}" if not pd.isna(val) else "—"
 
-# ── Sidebar: Cheat Sheet ──
-with st.sidebar:
-    st.markdown("## 📖 Score Cheat Sheet")
-
-    st.markdown("### Combs Score (0–100)")
-    st.markdown("*Is this a great business?*")
-    cheat_combs = pd.DataFrame({
-        'Sub-Score': ['Unit Economics', 'Frictionless Ops', 'Capital Allocation', 'Moat Strength', '**TOTAL**'],
-        'Max': ['/25', '/25', '/25', '/25', '**/100**'],
-        '🟢': ['>18', '>18', '>18', '>18', '**>65**'],
-        '🟡': ['12–18', '12–18', '12–18', '12–18', '**45–65**'],
-        '🔴': ['<12', '<12', '<12', '<12', '**<45**'],
-    })
-    st.dataframe(cheat_combs, hide_index=True, use_container_width=True)
-
-    st.markdown("### Weschler Score (0–100)")
-    st.markdown("*Is this mispriced?*")
-    cheat_weschler = pd.DataFrame({
-        'Sub-Score': ['Variant Perception', 'Complexity Discount', 'Distressed Value', 'Business Quality', 'LT Compounding', '**TOTAL**'],
-        'Max': ['/20', '/20', '/20', '/20', '/20', '**/100**'],
-        '🟢': ['>14', '>14', '>14', '>14', '>14', '**>60**'],
-        '🟡': ['8–14', '8–14', '8–14', '8–14', '8–14', '**40–60**'],
-        '🔴': ['<8', '<8', '<8', '<8', '<8', '**<40**'],
-    })
-    st.dataframe(cheat_weschler, hide_index=True, use_container_width=True)
-
-    st.markdown("### Verdicts")
-    st.markdown("""
-    - ✅ **HIGH CONVICTION** — Combined >60 + Quality >14
-    - ⚠️ **RESEARCH FURTHER** — Promising, needs work
-    - 🟡 **MONITOR** — Watch for catalyst
-    - ❌ **VALUE TRAP** — Low quality + distress
-    - ❌ **NOT COMPELLING** — Neither lens favours
-    """)
-
-    st.markdown("---")
-    st.markdown("### ★ = Highest Weight")
-    st.markdown("""
-    **Combs key metrics:**
-    - ★ ROIC (35% of Cap Alloc)
-    - ★ Gross/Op Margin (30% each of Unit Econ)
-    - ★ Rev CAGR (40% of Frictionless)
-
-    **Weschler key metrics:**
-    - ★ 52w Drawdown (30% of Distressed)
-    - ★ PE Gap/Sector (35% each of Variant)
-    - ★ ROIC (30% of Quality)
-    - ★ Earn/Rev CAGR 5y (30% each of Compounding)
-    """)
-
-# ── Main Content ──
-st.title("📊 Combs-Weschler S&P 500 Screener")
-
-last_modified = ""
-for p in ['data/screener_results.csv', '/Users/brendonmuur/Desktop/data/screener_results.csv']:
-    if os.path.exists(p):
-        import datetime
-        mtime = os.path.getmtime(p)
-        last_modified = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')
-        break
-st.caption(f"Last updated: {last_modified} · {len(df)} stocks analysed")
-
-# ── Tab Layout with auto-navigation ──
-if 'selected_ticker' not in st.session_state:
-    st.session_state.selected_ticker = 'AAPL'
-if 'navigate_to_deep_dive' not in st.session_state:
-    st.session_state.navigate_to_deep_dive = False
-
-# If navigating from Rankings, show Deep Dive as the main view
-if st.session_state.navigate_to_deep_dive:
-    st.session_state.navigate_to_deep_dive = False
-    selected = st.session_state.selected_ticker
-
-    # Back button
-    if st.button("← Back to Rankings", key="back_to_rankings"):
-        st.rerun()
+def render_deep_dive(selected, show_back_button=False):
+    """Render full deep dive for a ticker. Reusable across pages."""
+    if selected not in df.index:
+        st.error(f"{selected} not found")
+        return
 
     r = df.loc[selected]
     cs, ws, cb = r['combs_score'], r['weschler_score'], r['combined_score']
     wq = r.get('weschler_quality', 0)
     v_label, v_desc = verdict(cs, ws, cb, wq)
+
+    if show_back_button:
+        if st.button("← Back to Rankings", key="back_btn"):
+            st.session_state.navigate_to_deep_dive = False
+            st.rerun()
 
     st.markdown(f"# 🎯 {selected} — {r.get('company', '')}")
     st.markdown(f"**{r.get('sector', '')}** · Market Cap: ${r['market_cap']/1e9:.1f}B" if not pd.isna(r['market_cap']) else "")
@@ -173,7 +106,7 @@ if st.session_state.navigate_to_deep_dive:
             extra = " ← quality concern" if name == "Business Quality" and val < 10 else ""
             st.markdown(f"{signal(val, g, y)} **{name}**: {val:.1f}/{mx}{extra}")
         st.markdown("**Key Metrics:**")
-        for name, val, is_pct in [("★ 52w Drawdown", r.get('drawdown_52w'), True), ("vs 200d MA", r.get('price_vs_200ma'), True), ("★ PE", r.get('trailing_pe'), False), ("Short Interest", r.get('short_percent'), True), ("★ Earn CAGR 5y", r.get('earnings_cagr_5y'), True)]:
+        for name, val, is_pct in [("★ 52w Drawdown", r.get('drawdown_52w'), True), ("vs 200d MA", r.get('price_vs_200ma'), True), ("★ PE", r.get('trailing_pe'), False), ("Short Interest", r.get('short_percent'), True), ("★ Earn CAGR 5y", r.get('earnings_cagr_5y'), True), ("★ Rev CAGR 5y", r.get('revenue_cagr_5y'), True)]:
             if not pd.isna(val):
                 st.markdown(f"- {name}: `{fmt_pct(val) if is_pct else f'{val:.2f}'}`")
 
@@ -184,10 +117,70 @@ if st.session_state.navigate_to_deep_dive:
         wr = int((peers['weschler_score'] >= ws).sum())
         st.markdown(f"**Sector Rank** ({sector}, {len(peers)} peers): Combs #{cr} · Weschler #{wr}")
 
-    st.stop()
+# ── Sidebar: Cheat Sheet ──
+with st.sidebar:
+    st.markdown("## 📖 Score Cheat Sheet")
+    st.markdown("### Combs Score (0–100)")
+    st.markdown("*Is this a great business?*")
+    cheat_combs = pd.DataFrame({
+        'Sub-Score': ['Unit Economics', 'Frictionless Ops', 'Capital Allocation', 'Moat Strength', '**TOTAL**'],
+        'Max': ['/25', '/25', '/25', '/25', '**/100**'],
+        '🟢': ['>18', '>18', '>18', '>18', '**>65**'],
+        '🟡': ['12–18', '12–18', '12–18', '12–18', '**45–65**'],
+        '🔴': ['<12', '<12', '<12', '<12', '**<45**'],
+    })
+    st.dataframe(cheat_combs, hide_index=True, use_container_width=True)
 
-tab_names = ["🏆 Rankings", "🎯 Deep Dive", "📈 Scatter Plot", "🔥 Conviction", "📊 Sector Heatmap"]
-tab1, tab2, tab3, tab4, tab5 = st.tabs(tab_names)
+    st.markdown("### Weschler Score (0–100)")
+    st.markdown("*Is this mispriced?*")
+    cheat_weschler = pd.DataFrame({
+        'Sub-Score': ['Variant Perception', 'Complexity Discount', 'Distressed Value', 'Business Quality', 'LT Compounding', '**TOTAL**'],
+        'Max': ['/20', '/20', '/20', '/20', '/20', '**/100**'],
+        '🟢': ['>14', '>14', '>14', '>14', '>14', '**>60**'],
+        '🟡': ['8–14', '8–14', '8–14', '8–14', '8–14', '**40–60**'],
+        '🔴': ['<8', '<8', '<8', '<8', '<8', '**<40**'],
+    })
+    st.dataframe(cheat_weschler, hide_index=True, use_container_width=True)
+
+    st.markdown("### Verdicts")
+    st.markdown("""
+    - ✅ **HIGH CONVICTION** — Combined >60 + Quality >14
+    - ⚠️ **RESEARCH FURTHER** — Promising, needs work
+    - 🟡 **MONITOR** — Watch for catalyst
+    - ❌ **VALUE TRAP** — Low quality + distress
+    - ❌ **NOT COMPELLING** — Neither lens favours
+    """)
+    st.markdown("---")
+    st.markdown("★ = highest-weighted metric in sub-score")
+
+# ── Main Content ──
+# 1) Remove bar chart emoji from title
+st.title("Combs-Weschler S&P 500 Screener")
+
+last_modified = ""
+for p in ['data/screener_results.csv', '/Users/brendonmuur/Desktop/data/screener_results.csv']:
+    if os.path.exists(p):
+        import datetime
+        mtime = os.path.getmtime(p)
+        last_modified = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')
+        break
+st.caption(f"Last updated: {last_modified} · {len(df)} stocks analysed")
+
+# ── Session State ──
+if 'selected_ticker' not in st.session_state:
+    st.session_state.selected_ticker = 'AAPL'
+if 'navigate_to_deep_dive' not in st.session_state:
+    st.session_state.navigate_to_deep_dive = False
+if 'scatter_selected' not in st.session_state:
+    st.session_state.scatter_selected = None
+
+# 2) Deep dive from Rankings: show full page WITH tabs still visible
+if st.session_state.navigate_to_deep_dive:
+    render_deep_dive(st.session_state.selected_ticker, show_back_button=True)
+    st.markdown("---")
+
+# Tabs always visible
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏆 Rankings", "🎯 Deep Dive", "📈 Scatter Plot", "🔥 Conviction", "📊 Sector Heatmap"])
 
 # ══════════════════════════════════════════════
 # TAB 1: Rankings
@@ -215,20 +208,16 @@ with tab1:
     top_n = st.slider("Show top N:", 10, 50, 20)
     ranking = filtered.nlargest(top_n, score_col)[['company','sector','combs_score','weschler_score','combined_score','trailing_pe','roic','fcf_yield','operating_margin','drawdown_52w','revenue_cagr_3y']].copy()
 
-    # Mobile-friendly card layout
     for i, (ticker, row) in enumerate(ranking.iterrows(), 1):
         cs, ws, cb = row['combs_score'], row['weschler_score'], row['combined_score']
         c_col = _score_color_str(cs, 65, 45)
         w_col = _score_color_str(ws, 60, 40)
         cb_col = _score_color_str(cb, 60, 50)
-
         roic = fmt_pct(row.get('roic'))
         fy = fmt_pct(row.get('fcf_yield'))
         dd = fmt_pct(row.get('drawdown_52w'))
-        om = fmt_pct(row.get('operating_margin'))
         pe = f"{row['trailing_pe']:.0f}" if not pd.isna(row['trailing_pe']) else "—"
 
-        # Card with clickable button
         with st.container():
             col_btn, col_info = st.columns([1, 4])
             with col_btn:
@@ -251,141 +240,79 @@ with tab1:
 # ══════════════════════════════════════════════
 with tab2:
     ticker_options = sorted(df.index.tolist())
-    # Use session state ticker if set from Rankings tab
     default_ticker = st.session_state.get('selected_ticker', 'AAPL')
     default_idx = ticker_options.index(default_ticker) if default_ticker in ticker_options else 0
     selected = st.selectbox("Select ticker:", ticker_options, index=default_idx, key="deep_dive_ticker")
-    # Sync back to session state
     st.session_state.selected_ticker = selected
-
-    if selected and selected in df.index:
-        r = df.loc[selected]
-        cs, ws, cb = r['combs_score'], r['weschler_score'], r['combined_score']
-        wq = r.get('weschler_quality', 0)
-        v_label, v_desc = verdict(cs, ws, cb, wq)
-
-        # Header
-        st.markdown(f"# {selected} — {r.get('company', '')}")
-        st.markdown(f"**{r.get('sector', '')}** · Market Cap: ${r['market_cap']/1e9:.1f}B" if not pd.isna(r['market_cap']) else "")
-
-        desc = r.get('description', '')
-        if isinstance(desc, str) and len(desc) > 10:
-            with st.expander("Business Description"):
-                st.write(desc)
-
-        # Verdict banner
-        if "HIGH CONVICTION" in v_label:
-            st.success(f"**{v_label}** — {v_desc}")
-        elif "RESEARCH" in v_label:
-            st.warning(f"**{v_label}** — {v_desc}")
-        elif "MONITOR" in v_label:
-            st.info(f"**{v_label}** — {v_desc}")
-        else:
-            st.error(f"**{v_label}** — {v_desc}")
-
-        # Scores
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Combs Score", f"{cs:.1f}/100", delta=f"{signal(cs,65,45)}")
-        col2.metric("Weschler Score", f"{ws:.1f}/100", delta=f"{signal(ws,60,40)}")
-        col3.metric("Combined Score", f"{cb:.1f}/100", delta=f"{signal(cb,60,50)}")
-
-        st.markdown("---")
-
-        # Combs Breakdown
-        left, right = st.columns(2)
-        with left:
-            st.markdown("### 🎯 Combs — *Is this a great business?*")
-
-            combs_data = [
-                ("Unit Economics", r['combs_unit_economics'], 25, 18, 12),
-                ("Frictionless Ops", r['combs_frictionless'], 25, 18, 12),
-                ("Capital Allocation", r['combs_capital_allocation'], 25, 18, 12),
-                ("Moat Strength", r['combs_moat'], 25, 18, 12),
-            ]
-            for name, val, mx, g, y in combs_data:
-                st.markdown(f"{signal(val, g, y)} **{name}**: {val:.1f}/{mx}")
-
-            st.markdown("**Key Metrics:**")
-            metrics_c = [
-                ("★ ROIC", r.get('roic'), True), ("★ Gross Margin", r.get('gross_margin'), True),
-                ("★ Op Margin", r.get('operating_margin'), True), ("ROE", r.get('roe'), True),
-                ("FCF Yield", r.get('fcf_yield'), True), ("★ Rev CAGR 3y", r.get('revenue_cagr_3y'), True),
-                ("Margin Stability", r.get('margin_stability'), False),
-            ]
-            for name, val, is_pct in metrics_c:
-                if not pd.isna(val):
-                    display = fmt_pct(val) if is_pct else f"{val:.4f}"
-                    st.markdown(f"- {name}: `{display}`")
-
-        # Weschler Breakdown
-        with right:
-            st.markdown("### 🔍 Weschler — *Is this mispriced?*")
-
-            weschler_data = [
-                ("Variant Perception", r['weschler_variant'], 20, 14, 8),
-                ("Complexity Discount", r['weschler_complexity'], 20, 14, 8),
-                ("Distressed Value", r['weschler_distressed'], 20, 14, 8),
-                ("Business Quality", r['weschler_quality'], 20, 14, 8),
-                ("LT Compounding", r['weschler_compounding'], 20, 14, 8),
-            ]
-            for name, val, mx, g, y in weschler_data:
-                extra = " ← quality concern" if name == "Business Quality" and val < 10 else ""
-                st.markdown(f"{signal(val, g, y)} **{name}**: {val:.1f}/{mx}{extra}")
-
-            st.markdown("**Key Metrics:**")
-            metrics_w = [
-                ("★ 52w Drawdown", r.get('drawdown_52w'), True), ("vs 200d MA", r.get('price_vs_200ma'), True),
-                ("★ PE", r.get('trailing_pe'), False), ("Fwd PE", r.get('forward_pe'), False),
-                ("Short Interest", r.get('short_percent'), True), ("Earn Consistency", r.get('earnings_consistency'), False),
-                ("★ Earn CAGR 5y", r.get('earnings_cagr_5y'), True), ("★ Rev CAGR 5y", r.get('revenue_cagr_5y'), True),
-            ]
-            for name, val, is_pct in metrics_w:
-                if not pd.isna(val):
-                    display = fmt_pct(val) if is_pct else f"{val:.2f}"
-                    st.markdown(f"- {name}: `{display}`")
-
-        # Sector rank
-        sector = r.get('sector')
-        if sector and not pd.isna(sector):
-            peers = df[df['sector'] == sector]
-            cr = int((peers['combs_score'] >= cs).sum())
-            wr = int((peers['weschler_score'] >= ws).sum())
-            st.markdown(f"**Sector Rank** ({sector}, {len(peers)} peers): Combs #{cr} · Weschler #{wr}")
+    render_deep_dive(selected)
 
 # ══════════════════════════════════════════════
-# TAB 3: Scatter Plot
+# TAB 3: Scatter Plot (mobile-friendly touch)
 # ══════════════════════════════════════════════
 with tab3:
     st.markdown("### Combs vs Weschler — Quadrant Analysis")
-    st.markdown("Dots sized by market cap. Top 10 combined picks labelled.")
+    st.markdown("*Tap a dot for info. Tap again to deep dive. Pinch to zoom, drag to pan.*")
 
     plot_df = df.dropna(subset=['combs_score','weschler_score','market_cap']).copy()
     plot_df['log_mcap'] = np.log10(plot_df['market_cap'].clip(lower=1e8))
     plot_df['size'] = ((plot_df['log_mcap'] - plot_df['log_mcap'].min()) / (plot_df['log_mcap'].max() - plot_df['log_mcap'].min())) * 30 + 3
-    plot_df['label'] = plot_df.index
-    plot_df['hover'] = plot_df.apply(lambda x: f"{x.name}: {x.get('company','')} | C:{x['combs_score']:.0f} W:{x['weschler_score']:.0f} Comb:{x['combined_score']:.0f}", axis=1)
+    plot_df['ticker'] = plot_df.index
+    plot_df['hover_text'] = plot_df.apply(
+        lambda x: f"<b>{x.name}</b><br>{x.get('company','')}<br>C:{x['combs_score']:.0f} W:{x['weschler_score']:.0f} Comb:{x['combined_score']:.0f}<br>ROIC:{fmt_pct(x.get('roic'))} FCF:{fmt_pct(x.get('fcf_yield'))}", axis=1)
 
     fig = px.scatter(
         plot_df, x='combs_score', y='weschler_score', color='sector',
-        size='size', hover_name='hover', size_max=25, opacity=0.7,
-        labels={'combs_score': 'Combs Score (Business Quality)', 'weschler_score': 'Weschler Score (Mispricing)'},
+        size='size', custom_data=['ticker'],
+        hover_name='ticker', size_max=25, opacity=0.7,
+        labels={'combs_score': 'Combs Score', 'weschler_score': 'Weschler Score'},
     )
 
+    # Quadrant lines and labels
     med_c = plot_df['combs_score'].median()
     med_w = plot_df['weschler_score'].median()
     fig.add_vline(x=med_c, line_dash="dash", line_color="grey", opacity=0.5)
     fig.add_hline(y=med_w, line_dash="dash", line_color="grey", opacity=0.5)
-
-    fig.add_annotation(x=plot_df['combs_score'].max()-2, y=plot_df['weschler_score'].max()-1, text="BOTH AGREE<br>(Highest Conviction)", showarrow=False, font=dict(color="darkgreen", size=11))
-    fig.add_annotation(x=plot_df['combs_score'].min()+2, y=plot_df['weschler_score'].max()-1, text="WESCHLER<br>FAVOURITES", showarrow=False, font=dict(color="darkblue", size=11))
-    fig.add_annotation(x=plot_df['combs_score'].max()-2, y=plot_df['weschler_score'].min()+1, text="COMBS<br>FAVOURITES", showarrow=False, font=dict(color="darkorange", size=11))
-    fig.add_annotation(x=plot_df['combs_score'].min()+2, y=plot_df['weschler_score'].min()+1, text="NEITHER<br>FAVOURS", showarrow=False, font=dict(color="darkred", size=11))
+    fig.add_annotation(x=plot_df['combs_score'].max()-2, y=plot_df['weschler_score'].max()-1, text="BOTH AGREE", showarrow=False, font=dict(color="darkgreen", size=11))
+    fig.add_annotation(x=plot_df['combs_score'].min()+2, y=plot_df['weschler_score'].max()-1, text="WESCHLER<br>FAVS", showarrow=False, font=dict(color="darkblue", size=11))
+    fig.add_annotation(x=plot_df['combs_score'].max()-2, y=plot_df['weschler_score'].min()+1, text="COMBS<br>FAVS", showarrow=False, font=dict(color="darkorange", size=11))
+    fig.add_annotation(x=plot_df['combs_score'].min()+2, y=plot_df['weschler_score'].min()+1, text="NEITHER", showarrow=False, font=dict(color="darkred", size=11))
 
     for t, row in plot_df.nlargest(10, 'combined_score').iterrows():
         fig.add_annotation(x=row['combs_score'], y=row['weschler_score'], text=t, showarrow=True, arrowhead=0, ax=15, ay=-15, font=dict(size=10, color="black"))
 
-    fig.update_layout(height=700, legend=dict(orientation="h", yanchor="bottom", y=-0.2))
-    st.plotly_chart(fig, use_container_width=True)
+    # 3) Mobile touch: pinch-to-zoom + drag-to-pan (not box zoom)
+    fig.update_layout(
+        height=700,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.2),
+        dragmode='pan',
+    )
+    fig.update_xaxes(fixedrange=False)
+    fig.update_yaxes(fixedrange=False)
+
+    # Render with selection events
+    scatter_event = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="scatter_chart")
+
+    # Handle scatter click → show info, double-click → deep dive
+    if scatter_event and scatter_event.selection and scatter_event.selection.points:
+        point = scatter_event.selection.points[0]
+        clicked_ticker = point.get('customdata', [None])[0] if point.get('customdata') else None
+
+        if clicked_ticker and clicked_ticker in df.index:
+            r = df.loc[clicked_ticker]
+            cs, ws, cb = r['combs_score'], r['weschler_score'], r['combined_score']
+
+            st.markdown("---")
+            st.markdown(f"### Selected: **{clicked_ticker}** — {r.get('company','')}")
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Combs", f"{cs:.1f}")
+            c2.metric("Weschler", f"{ws:.1f}")
+            c3.metric("Combined", f"{cb:.1f}")
+            st.markdown(f"ROIC: {fmt_pct(r.get('roic'))} · FCF: {fmt_pct(r.get('fcf_yield'))} · Draw: {fmt_pct(r.get('drawdown_52w'))} · PE: {r.get('trailing_pe','—'):.1f}" if not pd.isna(r.get('trailing_pe')) else f"ROIC: {fmt_pct(r.get('roic'))} · FCF: {fmt_pct(r.get('fcf_yield'))}")
+
+            if st.button(f"🎯 Deep Dive into {clicked_ticker}", key=f"scatter_dd_{clicked_ticker}"):
+                st.session_state.selected_ticker = clicked_ticker
+                st.session_state.navigate_to_deep_dive = True
+                st.rerun()
 
 # ══════════════════════════════════════════════
 # TAB 4: Conviction
@@ -420,15 +347,19 @@ with tab4:
                 c2.metric("Weschler", f"{r['weschler_score']:.1f}")
                 c3.metric("Combined", f"{r['combined_score']:.1f}")
                 st.markdown(f"**{v_label}** — {v_desc}")
-                st.markdown(f"ROIC: {fmt_pct(r.get('roic'))} · FCF Yield: {fmt_pct(r.get('fcf_yield'))} · 52w Draw: {fmt_pct(r.get('drawdown_52w'))} · PE: {r.get('trailing_pe','—'):.1f}" if not pd.isna(r.get('trailing_pe')) else "")
+                if st.button(f"🎯 Deep Dive into {t}", key=f"conv_dd_{t}"):
+                    st.session_state.selected_ticker = t
+                    st.session_state.navigate_to_deep_dive = True
+                    st.rerun()
     else:
         st.warning("No stocks currently meet both thresholds (Combs ≥60 AND Weschler ≥60)")
 
 # ══════════════════════════════════════════════
-# TAB 5: Sector Heatmap
+# TAB 5: Sector Heatmap (mobile-friendly touch)
 # ══════════════════════════════════════════════
 with tab5:
     st.markdown("### Sector Score Heatmap")
+    st.markdown("*Pinch to zoom, drag to pan. Select a sector below for macro analysis.*")
 
     sector_agg = df.groupby('sector').agg({
         'combs_score': 'mean', 'weschler_score': 'mean', 'combined_score': 'mean',
@@ -447,7 +378,7 @@ with tab5:
         texttemplate="%{text}",
         colorscale='RdYlGn', zmin=35, zmax=65,
     ))
-    fig_heat.update_layout(height=500, title="Average Scores by Sector")
+    fig_heat.update_layout(height=500, title="Average Scores by Sector", dragmode='pan')
     st.plotly_chart(fig_heat, use_container_width=True)
 
     sub_cols = ['combs_unit_economics','combs_frictionless','combs_capital_allocation','combs_moat',
@@ -462,8 +393,79 @@ with tab5:
         texttemplate="%{text}",
         colorscale='RdYlGn',
     ))
-    fig_sub.update_layout(height=500, title="Sub-Score Breakdown by Sector")
+    fig_sub.update_layout(height=500, title="Sub-Score Breakdown by Sector", dragmode='pan')
     st.plotly_chart(fig_sub, use_container_width=True)
+
+    # 4) Sector macro analysis
+    st.markdown("---")
+    st.markdown("### 🌍 Sector Macro Analysis")
+
+    selected_sector = st.selectbox("Select sector for macro analysis:", sorted(sector_agg.index.tolist()), key="sector_macro")
+
+    if selected_sector:
+        sector_stocks = df[df['sector'] == selected_sector].sort_values('combined_score', ascending=False)
+        avg_draw = sector_stocks['drawdown_52w'].mean()
+        avg_pe = sector_stocks['trailing_pe'].mean()
+        avg_combs = sector_stocks['combs_score'].mean()
+        avg_weschler = sector_stocks['weschler_score'].mean()
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Stocks", len(sector_stocks))
+        c2.metric("Avg Drawdown", fmt_pct(avg_draw))
+        c3.metric("Avg PE", f"{avg_pe:.1f}" if not pd.isna(avg_pe) else "—")
+        c4.metric("Avg Combined", f"{(avg_combs+avg_weschler)/2:.1f}")
+
+        # Macro sentiment analysis based on quantitative signals
+        st.markdown("#### 📊 Quantitative Macro Signals")
+
+        signals = []
+        if avg_draw < -0.25:
+            signals.append(("🔴 **Significant sector drawdown**", f"Average 52-week drawdown of {avg_draw*100:.0f}% suggests broad selling pressure. Could indicate macro headwinds or sector rotation.", "Short-term"))
+        elif avg_draw < -0.15:
+            signals.append(("🟡 **Moderate sector weakness**", f"Average 52-week drawdown of {avg_draw*100:.0f}%. Some stocks may be oversold.", "Short-term"))
+        else:
+            signals.append(("🟢 **Sector holding up**", f"Average 52-week drawdown of {avg_draw*100:.0f}%. No broad distress signal.", "Short-term"))
+
+        high_short = sector_stocks[sector_stocks['short_percent'] > 0.05] if 'short_percent' in sector_stocks.columns else pd.DataFrame()
+        if len(high_short) > 3:
+            signals.append(("🔴 **Elevated short interest**", f"{len(high_short)} stocks with >5% short interest — bears are active in this sector.", "Short-term"))
+
+        avg_rev_cagr = sector_stocks['revenue_cagr_3y'].mean()
+        if not pd.isna(avg_rev_cagr):
+            if avg_rev_cagr > 0.10:
+                signals.append(("🟢 **Strong revenue growth**", f"Average 3-year revenue CAGR of {avg_rev_cagr*100:.1f}%. Structural tailwinds.", "Medium-term"))
+            elif avg_rev_cagr < 0:
+                signals.append(("🔴 **Revenue decline**", f"Average 3-year revenue CAGR of {avg_rev_cagr*100:.1f}%. Secular headwinds or cyclical downturn.", "Medium-term"))
+
+        avg_roic = sector_stocks['roic'].mean()
+        if not pd.isna(avg_roic):
+            if avg_roic > 0.20:
+                signals.append(("🟢 **High returns on capital**", f"Average ROIC of {avg_roic*100:.0f}% — businesses generate strong returns.", "Long-term"))
+            elif avg_roic < 0.08:
+                signals.append(("🔴 **Low returns on capital**", f"Average ROIC of {avg_roic*100:.0f}% — capital-intensive or competitive sector.", "Long-term"))
+
+        avg_margin_stability = sector_stocks['margin_stability'].mean() if 'margin_stability' in sector_stocks.columns else np.nan
+        if not pd.isna(avg_margin_stability):
+            if avg_margin_stability < 0.03:
+                signals.append(("🟢 **Stable margins**", "Low margin volatility — predictable earnings power.", "Long-term"))
+            elif avg_margin_stability > 0.08:
+                signals.append(("🟡 **Volatile margins**", "High margin volatility — earnings less predictable.", "Long-term"))
+
+        grey_zone = sector_stocks[(sector_stocks['altman_z'] >= 1.0) & (sector_stocks['altman_z'] <= 3.0)] if 'altman_z' in sector_stocks.columns else pd.DataFrame()
+        if len(grey_zone) > len(sector_stocks) * 0.3:
+            signals.append(("🟡 **Financial stress signals**", f"{len(grey_zone)} stocks ({len(grey_zone)/len(sector_stocks)*100:.0f}%) in Altman Z grey zone.", "Medium-term"))
+
+        for emoji_label, desc, horizon in signals:
+            st.markdown(f"**[{horizon}]** {emoji_label}")
+            st.caption(desc)
+
+        # Top/bottom movers in sector
+        st.markdown("#### 🏆 Top 5 in Sector (Combined Score)")
+        for i, (t, r) in enumerate(sector_stocks.head(5).iterrows(), 1):
+            if st.button(f"#{i} {t} — {r.get('company','')[:25]} (C:{r['combs_score']:.0f} W:{r['weschler_score']:.0f})", key=f"sector_{t}"):
+                st.session_state.selected_ticker = t
+                st.session_state.navigate_to_deep_dive = True
+                st.rerun()
 
 # ── Footer ──
 st.markdown("---")
