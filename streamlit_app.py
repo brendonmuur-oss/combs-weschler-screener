@@ -280,7 +280,7 @@ with tab3:
     for t, row in plot_df.nlargest(10, 'combined_score').iterrows():
         fig.add_annotation(x=row['combs_score'], y=row['weschler_score'], text=t, showarrow=True, arrowhead=0, ax=15, ay=-15, font=dict(size=10, color="black"))
 
-    # 3) Mobile touch: pinch-to-zoom + drag-to-pan (not box zoom)
+    # 3) Mobile touch: pinch-to-zoom + drag-to-pan
     fig.update_layout(
         height=700,
         legend=dict(orientation="h", yanchor="bottom", y=-0.2),
@@ -289,30 +289,36 @@ with tab3:
     fig.update_xaxes(fixedrange=False)
     fig.update_yaxes(fixedrange=False)
 
-    # Render with selection events
-    scatter_event = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="scatter_chart", config={"scrollZoom": True, "displayModeBar": False})
+    # Render chart — NO on_select (it blocks pinch-to-zoom on mobile)
+    st.plotly_chart(fig, use_container_width=True, config={
+        "scrollZoom": True,
+        "displayModeBar": True,
+        "modeBarButtonsToRemove": ["select2d", "lasso2d", "zoomIn2d", "zoomOut2d", "autoScale2d"],
+        "displaylogo": False,
+    })
 
-    # Handle scatter click → show info, double-click → deep dive
-    if scatter_event and scatter_event.selection and scatter_event.selection.points:
-        point = scatter_event.selection.points[0]
-        clicked_ticker = point.get('customdata', [None])[0] if point.get('customdata') else None
+    # Manual ticker selection for deep dive (works on mobile)
+    st.markdown("---")
+    scatter_ticker = st.selectbox(
+        "Select a stock from the chart to deep dive:",
+        ["— Select —"] + sorted(plot_df.index.tolist()),
+        key="scatter_select"
+    )
+    if scatter_ticker != "— Select —" and scatter_ticker in df.index:
+        r = df.loc[scatter_ticker]
+        cs, ws, cb = r['combs_score'], r['weschler_score'], r['combined_score']
 
-        if clicked_ticker and clicked_ticker in df.index:
-            r = df.loc[clicked_ticker]
-            cs, ws, cb = r['combs_score'], r['weschler_score'], r['combined_score']
+        st.markdown(f"### {scatter_ticker} — {r.get('company','')}")
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Combs", f"{cs:.1f}")
+        c2.metric("Weschler", f"{ws:.1f}")
+        c3.metric("Combined", f"{cb:.1f}")
+        st.markdown(f"ROIC: {fmt_pct(r.get('roic'))} · FCF: {fmt_pct(r.get('fcf_yield'))} · Draw: {fmt_pct(r.get('drawdown_52w'))}")
 
-            st.markdown("---")
-            st.markdown(f"### Selected: **{clicked_ticker}** — {r.get('company','')}")
-            c1, c2, c3 = st.columns(3)
-            c1.metric("Combs", f"{cs:.1f}")
-            c2.metric("Weschler", f"{ws:.1f}")
-            c3.metric("Combined", f"{cb:.1f}")
-            st.markdown(f"ROIC: {fmt_pct(r.get('roic'))} · FCF: {fmt_pct(r.get('fcf_yield'))} · Draw: {fmt_pct(r.get('drawdown_52w'))} · PE: {r.get('trailing_pe','—'):.1f}" if not pd.isna(r.get('trailing_pe')) else f"ROIC: {fmt_pct(r.get('roic'))} · FCF: {fmt_pct(r.get('fcf_yield'))}")
-
-            if st.button(f"🎯 Deep Dive into {clicked_ticker}", key=f"scatter_dd_{clicked_ticker}"):
-                st.session_state.selected_ticker = clicked_ticker
-                st.session_state.navigate_to_deep_dive = True
-                st.rerun()
+        if st.button(f"🎯 Deep Dive into {scatter_ticker}", key=f"scatter_dd_{scatter_ticker}"):
+            st.session_state.selected_ticker = scatter_ticker
+            st.session_state.navigate_to_deep_dive = True
+            st.rerun()
 
 # ══════════════════════════════════════════════
 # TAB 4: Conviction
