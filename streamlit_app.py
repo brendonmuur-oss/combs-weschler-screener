@@ -113,8 +113,17 @@ for p in ['data/screener_results.csv', '/Users/brendonmuur/Desktop/data/screener
         break
 st.caption(f"Last updated: {last_modified} · {len(df)} stocks analysed")
 
-# ── Tab Layout ──
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["🏆 Rankings", "🎯 Deep Dive", "📈 Scatter Plot", "🔥 Conviction", "📊 Sector Heatmap"])
+# ── Tab Layout with auto-navigation ──
+# Check if we need to auto-switch to Deep Dive
+auto_tab = st.query_params.get("tab", None)
+if auto_tab == "deep_dive":
+    default_tab_idx = 1  # Deep Dive tab
+    st.query_params.clear()
+else:
+    default_tab_idx = 0
+
+tab_names = ["🏆 Rankings", "🎯 Deep Dive", "📈 Scatter Plot", "🔥 Conviction", "📊 Sector Heatmap"]
+tab1, tab2, tab3, tab4, tab5 = st.tabs(tab_names)
 
 # Shared state for cross-tab navigation
 if 'selected_ticker' not in st.session_state:
@@ -146,40 +155,36 @@ with tab1:
     top_n = st.slider("Show top N:", 10, 50, 20)
     ranking = filtered.nlargest(top_n, score_col)[['company','sector','combs_score','weschler_score','combined_score','trailing_pe','roic','fcf_yield','operating_margin','drawdown_52w','revenue_cagr_3y']].copy()
 
-    # Render as interactive table with clickable tickers
-    st.markdown("*Click any ticker to open its Deep Dive*")
-
-    # Table header
-    header_cols = st.columns([1, 2.5, 1.5, 0.8, 0.8, 0.8, 0.7, 0.8, 0.8, 0.8, 0.8, 0.9])
-    headers = ['#', 'Company', 'Sector', 'Combs', 'Wesch', 'Comb', 'PE', 'ROIC', 'FCF%', 'OpMar', '52wDr', 'RevGr']
-    for col, h in zip(header_cols, headers):
-        col.markdown(f"**{h}**")
-
-    st.markdown("---")
-
+    # Mobile-friendly card layout
     for i, (ticker, row) in enumerate(ranking.iterrows(), 1):
-        cols = st.columns([1, 2.5, 1.5, 0.8, 0.8, 0.8, 0.7, 0.8, 0.8, 0.8, 0.8, 0.9])
-
-        # Ticker button — clicking sets the selected ticker and user can switch to Deep Dive tab
-        if cols[0].button(f"**{ticker}**", key=f"rank_{ticker}", help=f"Deep dive {ticker}"):
-            st.session_state.selected_ticker = ticker
-            st.toast(f"🎯 {ticker} selected — switch to Deep Dive tab", icon="🎯")
-
-        cols[1].caption(str(row.get('company', ''))[:25])
-        cols[2].caption(str(row.get('sector', ''))[:15])
-
-        # Colour-coded scores
         cs, ws, cb = row['combs_score'], row['weschler_score'], row['combined_score']
-        cols[3].markdown(f"<span style='color:{_score_color_str(cs, 65, 45)};font-weight:700'>{cs:.0f}</span>", unsafe_allow_html=True)
-        cols[4].markdown(f"<span style='color:{_score_color_str(ws, 60, 40)};font-weight:700'>{ws:.0f}</span>", unsafe_allow_html=True)
-        cols[5].markdown(f"<span style='color:{_score_color_str(cb, 60, 50)};font-weight:700'>{cb:.1f}</span>", unsafe_allow_html=True)
+        c_col = _score_color_str(cs, 65, 45)
+        w_col = _score_color_str(ws, 60, 40)
+        cb_col = _score_color_str(cb, 60, 50)
 
-        cols[6].caption(f"{row['trailing_pe']:.0f}" if not pd.isna(row['trailing_pe']) else "—")
-        cols[7].caption(fmt_pct(row.get('roic')))
-        cols[8].caption(fmt_pct(row.get('fcf_yield')))
-        cols[9].caption(fmt_pct(row.get('operating_margin')))
-        cols[10].caption(fmt_pct(row.get('drawdown_52w')))
-        cols[11].caption(fmt_pct(row.get('revenue_cagr_3y')))
+        roic = fmt_pct(row.get('roic'))
+        fy = fmt_pct(row.get('fcf_yield'))
+        dd = fmt_pct(row.get('drawdown_52w'))
+        om = fmt_pct(row.get('operating_margin'))
+        pe = f"{row['trailing_pe']:.0f}" if not pd.isna(row['trailing_pe']) else "—"
+
+        # Card with clickable button
+        with st.container():
+            col_btn, col_info = st.columns([1, 4])
+            with col_btn:
+                if st.button(f"#{i}\n**{ticker}**", key=f"rank_{ticker}", use_container_width=True):
+                    st.session_state.selected_ticker = ticker
+                    st.query_params["tab"] = "deep_dive"
+                    st.rerun()
+            with col_info:
+                st.markdown(f"**{str(row.get('company',''))[:35]}** · {str(row.get('sector',''))[:20]}")
+                st.markdown(
+                    f"<span style='color:{c_col};font-weight:700;margin-right:12px;'>C: {cs:.0f}</span>"
+                    f"<span style='color:{w_col};font-weight:700;margin-right:12px;'>W: {ws:.0f}</span>"
+                    f"<span style='color:{cb_col};font-weight:800;'>Comb: {cb:.1f}</span>"
+                    f"&nbsp;&nbsp;<span style='color:#666;font-size:0.85em;'>PE:{pe} · ROIC:{roic} · FCF:{fy} · Draw:{dd}</span>",
+                    unsafe_allow_html=True
+                )
 
 # ══════════════════════════════════════════════
 # TAB 2: Deep Dive
