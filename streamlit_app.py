@@ -290,7 +290,7 @@ with tab3:
     fig.update_yaxes(fixedrange=False)
 
     # Render with selection events
-    scatter_event = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="scatter_chart")
+    scatter_event = st.plotly_chart(fig, use_container_width=True, on_select="rerun", key="scatter_chart", config={"scrollZoom": True, "displayModeBar": False})
 
     # Handle scatter click → show info, double-click → deep dive
     if scatter_event and scatter_event.selection and scatter_event.selection.points:
@@ -379,7 +379,7 @@ with tab5:
         colorscale='RdYlGn', zmin=35, zmax=65,
     ))
     fig_heat.update_layout(height=500, title="Average Scores by Sector", dragmode='pan')
-    st.plotly_chart(fig_heat, use_container_width=True)
+    st.plotly_chart(fig_heat, use_container_width=True, config={"scrollZoom": True, "displayModeBar": False})
 
     sub_cols = ['combs_unit_economics','combs_frictionless','combs_capital_allocation','combs_moat',
                 'weschler_variant','weschler_complexity','weschler_distressed','weschler_quality','weschler_compounding']
@@ -394,7 +394,7 @@ with tab5:
         colorscale='RdYlGn',
     ))
     fig_sub.update_layout(height=500, title="Sub-Score Breakdown by Sector", dragmode='pan')
-    st.plotly_chart(fig_sub, use_container_width=True)
+    st.plotly_chart(fig_sub, use_container_width=True, config={"scrollZoom": True, "displayModeBar": False})
 
     # 4) Sector macro analysis
     st.markdown("---")
@@ -458,6 +458,61 @@ with tab5:
         for emoji_label, desc, horizon in signals:
             st.markdown(f"**[{horizon}]** {emoji_label}")
             st.caption(desc)
+
+        # ── News: Yahoo Finance headlines for sector's top movers ──
+        st.markdown("#### 📰 Recent News (Top Movers in Sector)")
+        st.caption("Headlines from Yahoo Finance for the sector's most notable stocks")
+
+        import yfinance as yf
+
+        @st.cache_data(ttl=3600, show_spinner="Fetching news...")
+        def fetch_sector_news(tickers, max_per_ticker=3):
+            """Fetch recent news from Yahoo Finance for a list of tickers."""
+            all_news = []
+            for t in tickers:
+                try:
+                    ticker_obj = yf.Ticker(t)
+                    news = ticker_obj.news or []
+                    for article in news[:max_per_ticker]:
+                        content = article.get('content', {})
+                        if not content:
+                            continue
+                        title = content.get('title', '')
+                        link = content.get('canonicalUrl', {}).get('url', '') or content.get('clickThroughUrl', {}).get('url', '')
+                        pub_date = content.get('pubDate', '')
+                        provider = content.get('provider', {}).get('displayName', '')
+                        summary = content.get('summary', '')
+                        if title:
+                            all_news.append({
+                                'ticker': t,
+                                'title': title,
+                                'link': link,
+                                'date': pub_date[:10] if pub_date else '',
+                                'source': provider,
+                                'summary': summary[:200] if summary else '',
+                            })
+                except Exception:
+                    pass
+            return all_news
+
+        # Fetch news for top 5 and bottom 5 stocks in sector (biggest movers)
+        top_tickers = sector_stocks.head(3).index.tolist()
+        bottom_tickers = sector_stocks.tail(2).index.tolist()
+        most_distressed = sector_stocks.nsmallest(2, 'drawdown_52w').index.tolist() if 'drawdown_52w' in sector_stocks.columns else []
+        news_tickers = list(dict.fromkeys(top_tickers + most_distressed + bottom_tickers))[:6]
+
+        news_items = fetch_sector_news(news_tickers)
+
+        if news_items:
+            for item in news_items[:12]:
+                link_html = f"[Read →]({item['link']})" if item['link'] else ""
+                st.markdown(f"**{item['ticker']}** · {item['date']} · _{item['source']}_")
+                st.markdown(f"[{item['title']}]({item['link']})" if item['link'] else item['title'])
+                if item['summary']:
+                    st.caption(item['summary'])
+                st.markdown("")
+        else:
+            st.info("No recent news found for this sector's key stocks.")
 
         # Top/bottom movers in sector
         st.markdown("#### 🏆 Top 5 in Sector (Combined Score)")
