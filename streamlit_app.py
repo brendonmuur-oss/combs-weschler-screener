@@ -566,6 +566,23 @@ with tab5:
                 if item['summary']:
                     st.caption(item['summary'])
                 st.markdown("")
+
+            # Sector-level alert thresholds
+            if len(news_items) >= 3:
+                bear_pct = bear_count / len(news_items) * 100
+                bull_pct = bull_count / len(news_items) * 100
+
+                st.markdown("#### ⚠️ Sector Alert Thresholds")
+                if bear_pct >= 70:
+                    st.error(f"🚨 **CRITICAL: {bear_pct:.0f}% bearish headlines** — Extreme negative sentiment. Potential sector-wide sell-off or major macro event. Review positions immediately.")
+                elif bear_pct >= 50:
+                    st.warning(f"⚠️ **WARNING: {bear_pct:.0f}% bearish headlines** — Majority negative sentiment. Monitor for contagion risk. May create buying opportunities for contrarian Weschler-style picks if fundamentals hold.")
+                elif bull_pct >= 70:
+                    st.success(f"🟢 **BULLISH: {bull_pct:.0f}% positive headlines** — Strong positive sentiment. Combs-style quality names likely leading. Watch for overvaluation risk.")
+                elif bull_pct >= 50:
+                    st.info(f"📈 **LEANING BULLISH: {bull_pct:.0f}% positive headlines** — Moderately positive sentiment. Sector fundamentals likely intact.")
+                else:
+                    st.info(f"📊 **MIXED SENTIMENT: {bull_pct:.0f}% bullish / {bear_pct:.0f}% bearish** — No clear directional signal. Stock-specific analysis more important than sector-level view.")
         else:
             st.info("No recent news found for this sector's key stocks.")
 
