@@ -381,37 +381,65 @@ with tab5:
         'weschler_compounding': 'mean',
     }).round(1).sort_values('combined_score', ascending=False)
 
+    # Shorten sector names for mobile
+    short_names = {
+        'Information Technology': 'Info Tech',
+        'Consumer Discretionary': 'Cons Disc',
+        'Communication Services': 'Comm Svcs',
+        'Consumer Staples': 'Cons Stap',
+        'Real Estate': 'Real Est',
+        'Health Care': 'Health',
+        'Financials': 'Finance',
+        'Industrials': 'Indust',
+        'Materials': 'Mater',
+        'Utilities': 'Util',
+        'Energy': 'Energy',
+    }
+    sector_labels = [short_names.get(s, s) for s in sector_agg.index]
+
     fig_heat = go.Figure(data=go.Heatmap(
         z=sector_agg[['combs_score','weschler_score','combined_score']].values,
-        x=['Combs Mean', 'Weschler Mean', 'Combined Mean'],
-        y=sector_agg.index.tolist(),
+        x=['Combs', 'Weschler', 'Combined'],
+        y=sector_labels,
         text=sector_agg[['combs_score','weschler_score','combined_score']].values.round(1),
         texttemplate="%{text}",
+        textfont=dict(size=12),
         colorscale='RdYlGn', zmin=35, zmax=65,
     ))
-    fig_heat.update_layout(height=500, title="Average Scores by Sector")
+    fig_heat.update_layout(
+        height=450,
+        title="Average Scores by Sector",
+        margin=dict(l=80, r=10, t=40, b=10),
+        xaxis=dict(side='top'),
+    )
     st.plotly_chart(fig_heat, use_container_width=True)
 
     sub_cols = ['combs_unit_economics','combs_frictionless','combs_capital_allocation','combs_moat',
                 'weschler_variant','weschler_complexity','weschler_distressed','weschler_quality','weschler_compounding']
-    sub_labels = ['Unit Econ','Frictionless','Cap Alloc','Moat','Variant','Complexity','Distressed','Quality','Compounding']
+    sub_labels = ['UE','Fric','Cap','Moat','Var','Comp','Dist','Qual','Cmpd']
 
     fig_sub = go.Figure(data=go.Heatmap(
         z=sector_agg[sub_cols].values,
         x=sub_labels,
-        y=sector_agg.index.tolist(),
+        y=sector_labels,
         text=sector_agg[sub_cols].values.round(1),
         texttemplate="%{text}",
+        textfont=dict(size=11),
         colorscale='RdYlGn',
     ))
-    fig_sub.update_layout(height=500, title="Sub-Score Breakdown by Sector")
+    fig_sub.update_layout(
+        height=450,
+        title="Sub-Score Breakdown",
+        margin=dict(l=80, r=10, t=40, b=10),
+        xaxis=dict(side='top'),
+    )
     st.plotly_chart(fig_sub, use_container_width=True)
 
     # 4) Sector macro analysis
     st.markdown("---")
     st.markdown("### 🌍 Sector Macro Analysis")
 
-    selected_sector = st.selectbox("Select sector for macro analysis:", sorted(sector_agg.index.tolist()), key="sector_macro")
+    selected_sector = st.selectbox("Select sector for macro analysis:", sorted(df['sector'].dropna().unique()), key="sector_macro")
 
     if selected_sector:
         sector_stocks = df[df['sector'] == selected_sector].sort_values('combined_score', ascending=False)
