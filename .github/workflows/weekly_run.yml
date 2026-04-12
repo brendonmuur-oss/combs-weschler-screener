@@ -293,10 +293,14 @@ jobs:
           print('Step 6: Sending email...')
           smtp_user = os.environ.get('CW_SMTP_USER', '')
           smtp_pass = os.environ.get('CW_SMTP_PASS', '')
+          DASHBOARD_URL = 'https://combs-weschler-screener-mhmd9c2vs8k9mfzngbqrqp.streamlit.app/'
           if smtp_user and smtp_pass:
               best = df['combined_score'].idxmax()
               conviction = df[(df['combs_score']>=60)&(df['weschler_score']>=60)].sort_values('combined_score', ascending=False)
+
+              # Plain text body
               body = f'Combs-Weschler Weekly Report — {run_date}\n\n'
+              body += f'📱 Dashboard: {DASHBOARD_URL}\n\n'
               body += f'Stocks: {len(df)} | Top: {best} ({df.loc[best,"combined_score"]:.1f})\n'
               body += f'Conviction (C>=60 & W>=60): {len(conviction)}\n\n'
               body += 'Top 10 Combined:\n'
@@ -308,11 +312,78 @@ jobs:
               body += '\nTop 10 Weschler:\n'
               for i,(t,r) in enumerate(df.nlargest(10,'weschler_score').iterrows(),1):
                   body += f'  {i}. {t} {r["weschler_score"]:.1f}\n'
+
+              # HTML body (mobile-friendly)
+              def _sc(v,g,y):
+                  if pd.isna(v): return '#999'
+                  return '#2e7d32' if v>=g else '#f57f17' if v>=y else '#c62828'
+              def _bg(v,g,y):
+                  if pd.isna(v): return '#f5f5f5'
+                  return '#e8f5e9' if v>=g else '#fff8e1' if v>=y else '#ffebee'
+              def fp(v):
+                  return f'{v*100:.1f}%' if not pd.isna(v) else '—'
+
+              html = f"""<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <style>
+                body {{ font-family: -apple-system, sans-serif; margin:0; padding:0; background:#f5f5f5; }}
+                .c {{ max-width:600px; margin:0 auto; background:white; }}
+                .h {{ background:linear-gradient(135deg,#1a237e,#0d47a1); color:white; padding:20px; text-align:center; }}
+                .s {{ padding:16px; border-bottom:1px solid #e0e0e0; }}
+                .st {{ font-size:16px; font-weight:700; color:#1a237e; margin:0 0 12px; }}
+                .mr {{ display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f0f0f0; }}
+                .ml {{ color:#666; font-size:13px; }} .mv {{ font-weight:700; font-size:14px; }}
+                .sc {{ display:inline-block; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:600; margin:2px; }}
+                .btn {{ display:inline-block; background:#1a237e; color:white; text-decoration:none; padding:12px 24px; border-radius:6px; font-weight:600; font-size:14px; margin:8px 0; }}
+                table {{ width:100%; border-collapse:collapse; font-size:13px; }}
+                th {{ background:#f5f5f5; padding:8px 6px; text-align:left; font-size:12px; color:#666; }}
+                td {{ padding:8px 6px; border-bottom:1px solid #f0f0f0; }}
+                .ft {{ background:#f5f5f5; padding:16px; text-align:center; font-size:12px; color:#999; }}
+              </style></head><body><div class="c">
+              <div class="h"><h1 style="margin:0;font-size:20px;">📊 Weekly Report</h1><p style="margin:5px 0 0;opacity:0.8;font-size:13px;">{run_date} · {len(df)} stocks</p></div>
+              <div class="s" style="text-align:center;padding:12px;"><a href="{DASHBOARD_URL}" class="btn">📱 Open Dashboard</a></div>"""
+
+              # Conviction
+              html += f'<div class="s"><div class="st">🔥 Highest Conviction ({len(conviction)} stocks)</div>'
+              if len(conviction)>0:
+                  for i,(t,r) in enumerate(conviction.head(10).iterrows(),1):
+                      cc=_sc(r['combs_score'],65,45); wc=_sc(r['weschler_score'],60,40); cbc=_sc(r['combined_score'],60,50)
+                      html += f'<div style="background:#fafafa;border-radius:8px;padding:12px;margin:8px 0;border-left:4px solid {cc};">'
+                      html += f'<b style="color:#1a237e;">#{i} {t}</b> <span style="color:#666;font-size:12px;">{str(r.get("company",""))[:30]}</span><br>'
+                      html += f'<span class="sc" style="background:{_bg(r["combs_score"],65,45)};color:{cc};">C:{r["combs_score"]:.0f}</span>'
+                      html += f'<span class="sc" style="background:{_bg(r["weschler_score"],60,40)};color:{wc};">W:{r["weschler_score"]:.0f}</span>'
+                      html += f'<span class="sc" style="background:{_bg(r["combined_score"],60,50)};color:{cbc};font-weight:800;">Comb:{r["combined_score"]:.1f}</span>'
+                      html += f'<br><span style="font-size:12px;color:#666;">ROIC:{fp(r.get("roic"))} · FCF:{fp(r.get("fcf_yield"))} · Draw:{fp(r.get("drawdown_52w"))}</span></div>'
+              else:
+                  html += '<p style="color:#999;">No stocks meet both thresholds.</p>'
+              html += '</div>'
+
+              # Top 10 tables
+              for title, col, metrics in [('🎯 Top 10 Combs', 'combs_score', [('ROIC','roic',True),('OpMar','operating_margin',True)]), ('🔍 Top 10 Weschler', 'weschler_score', [('Draw','drawdown_52w',True),('FCF','fcf_yield',True)])]:
+                  html += f'<div class="s"><div class="st">{title}</div><table><tr><th>#</th><th>Ticker</th><th>Score</th>'
+                  for mn,_,_ in metrics: html += f'<th>{mn}</th>'
+                  html += '</tr>'
+                  for i,(t,r) in enumerate(df.nlargest(10,col).iterrows(),1):
+                      bg = _bg(r[col], 65 if 'combs' in col else 60, 45 if 'combs' in col else 40)
+                      html += f'<tr style="background:{bg};"><td>{i}</td><td><b>{t}</b></td><td style="font-weight:700;">{r[col]:.1f}</td>'
+                      for _,mk,ip in metrics: html += f'<td>{fp(r.get(mk)) if ip else f"{r.get(mk,0):.1f}"}</td>'
+                      html += '</tr>'
+                  html += '</table></div>'
+
+              # Summary
+              html += f'<div class="s"><div class="st">📊 Summary</div>'
+              for label, val in [('Top Pick', f'{best} ({df.loc[best,"combined_score"]:.1f})'), ('Conviction Stocks', str(len(conviction))), ('Combs Range', f'{df["combs_score"].min():.0f} – {df["combs_score"].max():.0f}'), ('Weschler Range', f'{df["weschler_score"].min():.0f} – {df["weschler_score"].max():.0f}')]:
+                  html += f'<div class="mr"><span class="ml">{label}</span><span class="mv">{val}</span></div>'
+              html += '</div>'
+
+              html += f'<div class="ft"><a href="{DASHBOARD_URL}" style="color:#1a237e;">📱 Open Dashboard</a><br>Next run: Saturday 8am UTC</div></div></body></html>'
+
               try:
-                  msg = MIMEText(body)
+                  msg = MIMEMultipart('alternative')
                   msg['Subject'] = f'[CW Screener] Weekly Report — {run_date}'
                   msg['From'] = smtp_user
                   msg['To'] = smtp_user
+                  msg.attach(MIMEText(body, 'plain'))
+                  msg.attach(MIMEText(html, 'html'))
                   with smtplib.SMTP('smtp.gmail.com', 587) as server:
                       server.starttls()
                       server.login(smtp_user, smtp_pass)
